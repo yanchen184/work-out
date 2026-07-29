@@ -59,7 +59,7 @@
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 49 個測試
+npm test         # 50 個測試
 npm run build
 ```
 
@@ -75,6 +75,9 @@ npm run build
 自己 `users/{uid}` 底下的資料）已部署。**匿名登入尚未啟用** — 新專案的
 Authentication 要先在 Firebase Console 的 Authentication 頁點一次「開始使用」
 才會初始化，CLI 沒有對應指令。點開並啟用「匿名」後，跨裝置同步才會生效。
+
+在那之前，線上版頁尾會誠實顯示「資料存在這台裝置」而不是「已同步雲端」——
+登入失敗時 app 會自動退回 localStorage，功能完全不受影響。
 
 安全規則改動後重新部署：
 
@@ -103,10 +106,11 @@ src/
 
 ## 測試
 
-49 個測試，分兩層：
+50 個測試，分兩層：
 
 - `domain/week.test.ts` — 週次邊界（跨年 ISO 週）、打勾、替換的補做池規則、進度計算
-- `App.test.tsx` — 真實點擊流程：打勾、整段打勾、替換、新增、週切換、模板套用
+- `App.test.tsx` — 真實點擊流程：打勾、整段打勾、替換、新增、週切換、模板套用，
+  以及「雲端沒真的連上時，頁尾不能謊稱已同步」
 
 瀏覽器端另外跑過 25 項 round-trip（含破版、深色模式、320px 窄螢幕、
 重新整理後資料保留）。
