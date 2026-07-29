@@ -4,7 +4,7 @@ import { useWorkout } from './lib/useWorkout'
 import { CATALOG, DAY_LABELS, groupById } from './domain/catalog'
 import { formatWeekRange, overallProgress, weekProgress } from './domain/week'
 import { checkKey, type DayIndex, type SlotKey } from './domain/types'
-import { linkGoogle } from './lib/firebase'
+import { USERS } from './lib/firebase'
 
 const DAYS: readonly DayIndex[] = [0, 1, 2, 3, 4, 5, 6]
 const SLOTS: readonly SlotKey[] = ['morning', 'evening']
@@ -26,6 +26,25 @@ export default function App() {
   const w = useWorkout()
   const [sheet, setSheet] = useState<Sheet>(null)
   const [editingTemplate, setEditingTemplate] = useState(false)
+
+  // 還沒選過使用者 → 選一次，之後開啟就直接進來
+  if (!w.uid) {
+    return (
+      <div className="app">
+        <div className="pick">
+          <h1 className="pick-title">每週健身</h1>
+          <p className="pick-sub">選一個帳號，之後開啟就不用再選</p>
+          <div className="pick-list">
+            {USERS.map((u) => (
+              <button key={u} className="pick-btn" onClick={() => w.login(u)}>
+                {u}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (!w.plan) {
     return (
@@ -332,19 +351,12 @@ export default function App() {
       )}
 
       <footer className="ft">
-        {w.cloudReady && w.isAnonymous && (
-          <button
-            className="link-btn"
-            onClick={() => {
-              void linkGoogle().catch((e: unknown) => {
-                console.warn('綁定失敗', e)
-              })
-            }}
-          >
-            綁定 Google 帳號（換手機資料跟著走）
-          </button>
-        )}
         <span>{w.cloudReady ? '資料已同步雲端' : '資料存在這台裝置'}</span>
+        <span className="ft-sep">·</span>
+        <span>{w.uid}</span>
+        <button className="link-btn" onClick={w.logout}>
+          登出
+        </button>
       </footer>
 
       {sheet && (

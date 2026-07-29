@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db, firebaseEnabled } from './firebase'
+export type { UserId } from './firebase'
 import type { Schedule, Template, WeekPlan } from '../domain/types'
 import { defaultSchedule } from '../domain/catalog'
 import { createWeekPlan } from '../domain/week'
@@ -31,6 +32,30 @@ function writeLocal(key: string, value: unknown): void {
   }
 }
 
+/**
+ * 雲端到底通不通，只認「真的成功讀或寫過一次 Firestore」。
+ * 不准拿「設定有填」當通了 —— 那是 handshake，會讓畫面對使用者說謊。
+ */
+let cloudOk = false
+const cloudListeners = new Set<(ok: boolean) => void>()
+
+function setCloudOk(ok: boolean): void {
+  if (cloudOk === ok) return
+  cloudOk = ok
+  for (const listener of cloudListeners) listener(ok)
+}
+
+export function isCloudOk(): boolean {
+  return cloudOk
+}
+
+/** 訂閱雲端連線狀態，回傳 unsubscribe */
+export function watchCloud(listener: (ok: boolean) => void): () => void {
+  cloudListeners.add(listener)
+  listener(cloudOk)
+  return () => cloudListeners.delete(listener)
+}
+
 /** ---------- 模板 ---------- */
 
 export async function loadTemplate(uid: string): Promise<Template> {
@@ -39,6 +64,7 @@ export async function loadTemplate(uid: string): Promise<Template> {
   if (firebaseEnabled && db) {
     try {
       const snap = await getDoc(doc(db, 'users', uid, 'meta', 'template'))
+      setCloudOk(true)
       if (snap.exists()) {
         const remote = snap.data() as Template
         // 取較新的那份
@@ -48,6 +74,7 @@ export async function loadTemplate(uid: string): Promise<Template> {
         }
       }
     } catch (error: unknown) {
+      setCloudOk(false)
       console.warn('讀取雲端模板失敗，使用本機資料', error)
     }
   }
@@ -63,7 +90,9 @@ export async function saveTemplate(uid: string, schedule: Schedule): Promise<voi
   if (firebaseEnabled && db) {
     try {
       await setDoc(doc(db, 'users', uid, 'meta', 'template'), template)
+      setCloudOk(true)
     } catch (error: unknown) {
+      setCloudOk(false)
       console.warn('同步模板到雲端失敗，已存在本機', error)
     }
   }
@@ -81,6 +110,7 @@ export async function loadWeek(
   if (firebaseEnabled && db) {
     try {
       const snap = await getDoc(doc(db, 'users', uid, 'weeks', weekKey))
+      setCloudOk(true)
       if (snap.exists()) {
         const remote = snap.data() as WeekPlan
         if (!local || remote.updatedAt >= local.updatedAt) {
@@ -89,6 +119,7 @@ export async function loadWeek(
         }
       }
     } catch (error: unknown) {
+      setCloudOk(false)
       console.warn('讀取雲端週計畫失敗，使用本機資料', error)
     }
   }
@@ -112,19 +143,10 @@ export async function saveWeek(uid: string, plan: WeekPlan): Promise<void> {
   if (firebaseEnabled && db) {
     try {
       await setDoc(doc(db, 'users', uid, 'weeks', plan.weekKey), plan)
+      setCloudOk(true)
     } catch (error: unknown) {
+      setCloudOk(false)
       console.warn('同步週計畫到雲端失敗，已存在本機', error)
     }
   }
-}
-
-/** 沒有 Firebase 時用的本機使用者 id */
-export function localUid(): string {
-  const key = `${LOCAL_PREFIX}:uid`
-  let id = localStorage.getItem(key)
-  if (!id) {
-    id = `local-${Math.random().toString(36).slice(2, 10)}`
-    localStorage.setItem(key, id)
-  }
-  return id
 }

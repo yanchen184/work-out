@@ -11,20 +11,26 @@ import {
   weekKeyOf,
 } from '../domain/week'
 import { defaultSchedule } from '../domain/catalog'
-import { firebaseEnabled, watchAuth } from './firebase'
+import {
+  clearUser,
+  firebaseEnabled,
+  readSavedUser,
+  saveUser,
+  type UserId,
+} from './firebase'
 import {
   loadTemplate,
   loadWeek,
-  localUid,
   saveTemplate,
   saveWeek,
   saveWeekLocal,
+  watchCloud,
 } from './store'
 
 export interface WorkoutState {
-  readonly uid: string | null
-  readonly isAnonymous: boolean
-  /** 真的登入成功、資料會進雲端才是 true。設定填了但登入失敗時是 false。 */
+  /** 目前選的使用者；null = 還沒選（顯示選人畫面） */
+  readonly uid: UserId | null
+  /** 真的讀寫過 Firestore 才是 true。設定填了但連不上時是 false。 */
   readonly cloudReady: boolean
   readonly weekOffset: number
   readonly weekKey: string
@@ -35,8 +41,8 @@ export interface WorkoutState {
 }
 
 export function useWorkout() {
-  const [uid, setUid] = useState<string | null>(null)
-  const [isAnonymous, setIsAnonymous] = useState(false)
+  // 上次選過的使用者直接進，不用再選一次
+  const [uid, setUid] = useState<UserId | null>(readSavedUser)
   const [cloudReady, setCloudReady] = useState(false)
   const [weekOffset, setWeekOffset] = useState(0)
   const [plan, setPlan] = useState<WeekPlan | null>(null)
@@ -47,28 +53,8 @@ export function useWorkout() {
   const weekKey = shiftWeekKey(new Date(), weekOffset)
   const saveTimer = useRef<number | undefined>(undefined)
 
-  // 登入
-  useEffect(() => {
-    if (!firebaseEnabled) {
-      setUid(localUid())
-      setIsAnonymous(true)
-      setCloudReady(false)
-      return
-    }
-    return watchAuth((state) => {
-      if (state.user) {
-        setUid(state.user.uid)
-        setIsAnonymous(state.isAnonymous)
-        setCloudReady(true)
-      } else if (state.ready) {
-        // 匿名登入失敗 → 退回本機。設定有填不代表雲端通了，
-        // 這裡要把 cloudReady 壓回 false，否則畫面會謊稱「已同步雲端」。
-        setUid(localUid())
-        setIsAnonymous(true)
-        setCloudReady(false)
-      }
-    })
-  }, [])
+  // 雲端狀態：由 store 真的讀寫成功／失敗回報，不是看設定有沒有填
+  useEffect(() => watchCloud(setCloudReady), [])
 
   // 載入模板
   useEffect(() => {
@@ -189,6 +175,23 @@ export function useWorkout() {
       persist({ ...plan, schedule: template, makeups: [], updatedAt: Date.now() })
     }, [plan, template, persist]),
 
+    /** 選使用者：記住，之後開啟就不用再選 */
+    login: useCallback((user: UserId) => {
+      saveUser(user)
+      setUid(user)
+      setPlan(null)
+      setLoading(true)
+    }, []),
+
+    /** 換人：忘掉選擇，回到選人畫面（資料留在雲端與本機） */
+    logout: useCallback(() => {
+      clearUser()
+      setUid(null)
+      setPlan(null)
+      setWeekOffset(0)
+      setTemplate(defaultSchedule())
+    }, []),
+
     goPrevWeek: useCallback(() => setWeekOffset((o) => o - 1), []),
     goNextWeek: useCallback(() => setWeekOffset((o) => o + 1), []),
     goThisWeek: useCallback(() => setWeekOffset(0), []),
@@ -199,7 +202,6 @@ export function useWorkout() {
 
   return {
     uid,
-    isAnonymous,
     cloudReady,
     weekKey,
     weekOffset,

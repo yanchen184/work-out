@@ -17,12 +17,20 @@
 - 線上版：https://yanchen184.github.io/work-out/（push main 自動部署，`.github/workflows/deploy.yml`）
 - Firebase 專案：`work-out-yc`
 
+## 帳號模型（2026-07-29 定案，別再自作主張加回登入）
+
+三個固定帳號 `bob` / `user1` / `user2`，**沒有密碼、沒有 Firebase Auth**。
+選過就存 localStorage，之後直接進；頁尾一顆小小的登出可換人。
+匿名登入與 Google 綁定已**刻意砍掉** — 尊上的原話是「不要這麼複雜 使用者基本上只要我一個」，
+但「我會手機跟電腦同步的需求」，所以 Firestore 同步層保留、只砍掉多使用者那套機制。
+
+安全性是**明知的取捨**：規則允許未登入讀寫這三格，換來開同一網址就同步。
+`firestore.rules` 已把範圍鎖死在這三個 uid 的 `weeks/{weekKey}` 與 `meta/template`，
+其他路徑一律拒。**不要「順手」把 Auth 加回來**，要加得先問。
+
 ## 目前未完成（更新狀態頁時記得對帳）
 
-- **匿名登入未啟用**：Firestore 與安全規則已部署且實測擋得住未授權寫入，
-  但 Authentication 還沒初始化 — 新專案要在 Firebase Console 的 Authentication
-  頁點一次「開始使用」再啟用「匿名」，CLI 與 API 都做不到（API 會被導向要收費的
-  Identity Platform）。**在真的跨裝置同步驗過之前，狀態頁的雲端同步維持 ⚠️，不准改 ✅。**
+（無）跨裝置同步已於 2026-07-29 用兩個獨立瀏覽器 context 實測雙向通過。
 
 ## 這個專案的設計前提
 

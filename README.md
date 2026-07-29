@@ -25,7 +25,9 @@
 | 模板編輯 | 右上 ⚙ 進模板模式，改動**套用到往後每一週** |
 | 週切換 | `‹ ›` 看前後幾週，每週資料各自獨立 |
 | 部位進度 | 11 項各自的「已完成時段數 / 週目標」，排不夠的標紅 |
-| 離線可用 | 資料先寫本機，有設定 Firebase 才另外同步雲端 |
+| 三個帳號 | 首次開啟選 `bob` / `user1` / `user2`，選過就記住；頁尾有小小的登出可換人 |
+| 跨裝置同步 | 同一個帳號在手機與電腦看到同一份資料（Firestore） |
+| 離線可用 | 資料先寫本機，雲端連不上照樣完整可用 |
 
 ## 畫面
 
@@ -59,25 +61,27 @@
 ```bash
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 50 個測試
+npm test         # 54 個測試
 npm run build
 ```
 
-### Firebase（選用）
+### 帳號與 Firebase
 
-沒有設定也能跑，資料存在瀏覽器 localStorage。要跨裝置同步才需要設定
-`VITE_FIREBASE_API_KEY`、`VITE_FIREBASE_AUTH_DOMAIN`、`VITE_FIREBASE_PROJECT_ID`、
-`VITE_FIREBASE_APP_ID` 這幾個環境變數（寫在 `.env.local`，不進版控）。
+只有三個固定帳號 `bob` / `user1` / `user2`，**沒有密碼、沒有登入驗證**。
+首次開啟選一個，選擇存在 localStorage，之後開啟直接進；頁尾有小小的「登出」可換人。
+帳號只決定資料存在雲端哪一格（`users/{bob|user1|user2}`），不是安全邊界。
 
-開啟後自動匿名登入；想換手機時在頁面底部綁定 Google 帳號即可帶著資料走。
+**這是刻意的取捨**：換來手機與電腦開同一網址就同步，代價是知道 Firebase 專案 ID 的人
+也能讀寫這三格。`firestore.rules` 因此把可寫範圍鎖死在這三個 uid 的
+`weeks/{weekKey}` 與 `meta/template` 兩種路徑，其他一律拒絕，避免被當成公開資料庫亂寫。
+存的是健身打勾紀錄，沒有個資。要真正的存取控制就得加回 Google 登入。
 
-專案 `work-out-yc` 已建好，Firestore 與安全規則（`firestore.rules`：每人只能讀寫
-自己 `users/{uid}` 底下的資料）已部署。**匿名登入尚未啟用** — 新專案的
-Authentication 要先在 Firebase Console 的 Authentication 頁點一次「開始使用」
-才會初始化，CLI 沒有對應指令。點開並啟用「匿名」後，跨裝置同步才會生效。
+沒設定 Firebase 也能跑，資料存在瀏覽器 localStorage（就是沒有跨裝置同步）。
+要同步需設定 `VITE_FIREBASE_API_KEY`、`VITE_FIREBASE_AUTH_DOMAIN`、
+`VITE_FIREBASE_PROJECT_ID`、`VITE_FIREBASE_APP_ID`（寫在 `.env.local`，不進版控）。
 
-在那之前，線上版頁尾會誠實顯示「資料存在這台裝置」而不是「已同步雲端」——
-登入失敗時 app 會自動退回 localStorage，功能完全不受影響。
+頁尾的「資料已同步雲端／資料存在這台裝置」看的是**真的讀寫過 Firestore 沒有**，
+不是「設定有沒有填」——雲端掛掉時它會誠實變回「資料存在這台裝置」，功能不受影響。
 
 安全規則改動後重新部署：
 
@@ -95,7 +99,7 @@ src/
 │   ├── week.ts
 │   └── week.test.ts
 ├── lib/
-│   ├── firebase.ts  # 匿名登入 / Google 綁定
+│   ├── firebase.ts  # Firestore 初始化 + 三個固定帳號
 │   ├── store.ts     # 本機優先，雲端次之
 │   └── useWorkout.ts
 ├── App.tsx
@@ -106,11 +110,13 @@ src/
 
 ## 測試
 
-50 個測試，分兩層：
+54 個測試，分兩層：
 
 - `domain/week.test.ts` — 週次邊界（跨年 ISO 週）、打勾、替換的補做池規則、進度計算
-- `App.test.tsx` — 真實點擊流程：打勾、整段打勾、替換、新增、週切換、模板套用，
-  以及「雲端沒真的連上時，頁尾不能謊稱已同步」
+- `App.test.tsx` — 真實點擊流程：打勾、整段打勾、替換、新增、週切換、模板套用、
+  選人／記住／登出、不同帳號資料隔離，以及「雲端沒真的連上時，頁尾不能謊稱已同步」
 
 瀏覽器端另外跑過 25 項 round-trip（含破版、深色模式、320px 窄螢幕、
-重新整理後資料保留）。
+重新整理後資料保留），以及 10 項跨裝置同步驗證：用兩個獨立的瀏覽器 context
+（各自空的 localStorage = 兩台裝置）互相確認打勾真的傳得過去、傳得回來，
+且 `user2` 的改動不會污染 `bob`。

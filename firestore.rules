@@ -1,11 +1,21 @@
 rules_version = '2';
 
+// 這是自用的健身打勾紀錄，只有固定三個使用者、不做登入驗證。
+// 取捨：換來手機／電腦開同一網址就同步，代價是知道專案 ID 的人也能讀寫這三格。
+// 因此嚴格限制在這三個 uid 與兩種文件路徑 —— 其他一律拒絕，
+// 避免這個專案被當成免費的公開資料庫亂寫。
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 每個人只能碰自己的資料，其他一律拒絕。
-    // 匿名登入也算已登入，uid 一樣受這條保護。
-    match /users/{uid}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+    function isKnownUser(uid) {
+      return uid in ['bob', 'user1', 'user2'];
+    }
+
+    match /users/{uid}/weeks/{weekKey} {
+      allow read, write: if isKnownUser(uid);
+    }
+
+    match /users/{uid}/meta/template {
+      allow read, write: if isKnownUser(uid);
     }
 
     match /{document=**} {
