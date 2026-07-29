@@ -4,7 +4,7 @@ import { useWorkout } from './lib/useWorkout'
 import { CATALOG, DAY_LABELS, groupById } from './domain/catalog'
 import { formatWeekRange, overallProgress, weekProgress } from './domain/week'
 import { checkKey, type DayIndex, type SlotKey } from './domain/types'
-import { firebaseEnabled, linkGoogle } from './lib/firebase'
+import { linkGoogle } from './lib/firebase'
 
 const DAYS: readonly DayIndex[] = [0, 1, 2, 3, 4, 5, 6]
 const SLOTS: readonly SlotKey[] = ['morning', 'evening']
@@ -332,7 +332,7 @@ export default function App() {
       )}
 
       <footer className="ft">
-        {firebaseEnabled && w.isAnonymous && (
+        {w.cloudReady && w.isAnonymous && (
           <button
             className="link-btn"
             onClick={() => {
@@ -344,7 +344,7 @@ export default function App() {
             綁定 Google 帳號（換手機資料跟著走）
           </button>
         )}
-        <span>{firebaseEnabled ? '資料已同步雲端' : '資料存在這台裝置'}</span>
+        <span>{w.cloudReady ? '資料已同步雲端' : '資料存在這台裝置'}</span>
       </footer>
 
       {sheet && (

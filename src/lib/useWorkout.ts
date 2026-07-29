@@ -24,6 +24,8 @@ import {
 export interface WorkoutState {
   readonly uid: string | null
   readonly isAnonymous: boolean
+  /** 真的登入成功、資料會進雲端才是 true。設定填了但登入失敗時是 false。 */
+  readonly cloudReady: boolean
   readonly weekOffset: number
   readonly weekKey: string
   readonly plan: WeekPlan | null
@@ -35,6 +37,7 @@ export interface WorkoutState {
 export function useWorkout() {
   const [uid, setUid] = useState<string | null>(null)
   const [isAnonymous, setIsAnonymous] = useState(false)
+  const [cloudReady, setCloudReady] = useState(false)
   const [weekOffset, setWeekOffset] = useState(0)
   const [plan, setPlan] = useState<WeekPlan | null>(null)
   const [template, setTemplate] = useState<Schedule>(defaultSchedule)
@@ -49,16 +52,20 @@ export function useWorkout() {
     if (!firebaseEnabled) {
       setUid(localUid())
       setIsAnonymous(true)
+      setCloudReady(false)
       return
     }
     return watchAuth((state) => {
       if (state.user) {
         setUid(state.user.uid)
         setIsAnonymous(state.isAnonymous)
+        setCloudReady(true)
       } else if (state.ready) {
-        // 匿名登入失敗 → 退回本機
+        // 匿名登入失敗 → 退回本機。設定有填不代表雲端通了，
+        // 這裡要把 cloudReady 壓回 false，否則畫面會謊稱「已同步雲端」。
         setUid(localUid())
         setIsAnonymous(true)
+        setCloudReady(false)
       }
     })
   }, [])
@@ -193,6 +200,7 @@ export function useWorkout() {
   return {
     uid,
     isAnonymous,
+    cloudReady,
     weekKey,
     weekOffset,
     plan,

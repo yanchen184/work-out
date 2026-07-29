@@ -217,4 +217,15 @@ describe('App — 週切換與模板', () => {
     })
     expect(within(dayCard('二')).getByText('腿')).toBeTruthy()
   })
+
+  it('雲端沒真的連上時，頁尾不能謊稱已同步', async () => {
+    render(<App />)
+    await screen.findByText('本週完成度')
+
+    // 測試環境沒有 Firebase 設定 → 一定是本機模式。
+    // 這條擋的是「設定填了就說已同步」那種只看 handshake 的寫法。
+    expect(screen.getByText('資料存在這台裝置')).toBeTruthy()
+    expect(screen.queryByText('資料已同步雲端')).toBeNull()
+    expect(screen.queryByText(/綁定 Google 帳號/)).toBeNull()
+  })
 })
