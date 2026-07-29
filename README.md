@@ -1,32 +1,99 @@
-# React + TypeScript + Vite
+# 每週健身
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+一頁式的每週健身打勾紀錄。7 天 × 早／晚時段，點一下就打勾，排錯了可以當週替換或直接改模板。
 
-Currently, two official plugins are available:
+![每週健身主畫面](docs/images/01-home.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 為什麼是這樣設計
 
-## React Compiler
+每週有固定的訓練配額（胸 15 組兩個時段、籃球 3 小時一個時段…共 11 項），
+但實際哪天做哪項會變。所以：
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **課表是可變的**，不是寫死的。預設的早上課表只是起點，隨時可以改。
+- **只打勾，不記組數**。做了就是做了，不需要在健身房裡輸入數字。
+- **換掉沒做的東西不會憑空消失**，會進「本週補做」，提醒這週還欠什麼。
 
-## Expanding the Oxlint configuration
+## 功能
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+| 功能 | 說明 |
+|---|---|
+| 打勾 | 點部位就標記完成；每個時段右邊的 ✓ 可一次打勾整段 |
+| 單週替換 | 點 `⋯` 換成別的部位，**只影響這一週** |
+| 補做池 | 被換掉／移除但**還沒打勾**的項目會進補做池；已打勾的不會（已經做過了） |
+| 模板編輯 | 右上 ⚙ 進模板模式，改動**套用到往後每一週** |
+| 週切換 | `‹ ›` 看前後幾週，每週資料各自獨立 |
+| 部位進度 | 11 項各自的「已完成時段數 / 週目標」，排不夠的標紅 |
+| 離線可用 | 資料先寫本機，有設定 Firebase 才另外同步雲端 |
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## 畫面
+
+| 打勾後 | 替換選單 | 補做池 |
+|---|---|---|
+| ![打勾](docs/images/02-checked.png) | ![替換](docs/images/03-sheet.png) | ![補做](docs/images/04-makeup.png) |
+
+| 模板模式 | 深色模式 |
+|---|---|
+| ![模板](docs/images/05-template.png) | ![深色](docs/images/06-dark.png) |
+
+## 每週配額
+
+| 部位 | 目標 | 時段數 |
+|---|---|---|
+| 胸 / 肩 / 背 | 15 組 | 2 |
+| 腿 | — | 2 |
+| 二三頭 | 20 分鐘 | 2 |
+| 腹肌 | 30 分鐘 | 2 |
+| 間歇 | 20 分鐘 | 2 |
+| 有氧課程 | 1 小時 | 1 |
+| 籃球 | 3 小時 | 1 |
+| 壁球 | 2 小時 | 1 |
+| 腳踏車 | 2 小時 | 1 |
+
+預設早上課表：一 二三頭/胸/肩 · 二 間歇/背 · 三 腹肌/有氧課程 ·
+四 二三頭/籃球 · 五 間歇/胸/肩 · 六 腹肌/背。晚上時段預設留空，自己排。
+
+## 開發
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # 49 個測試
+npm run build
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+### Firebase（選用）
+
+沒有設定也能跑，資料存在瀏覽器 localStorage。要跨裝置同步才需要設定
+`VITE_FIREBASE_API_KEY`、`VITE_FIREBASE_AUTH_DOMAIN`、`VITE_FIREBASE_PROJECT_ID`、
+`VITE_FIREBASE_APP_ID` 這幾個環境變數（寫在 `.env.local`，不進版控）。
+
+開啟後自動匿名登入；想換手機時在頁面底部綁定 Google 帳號即可帶著資料走。
+
+## 結構
+
+```
+src/
+├── domain/          # 純函式：週次計算、打勾、替換、補做池、進度
+│   ├── types.ts
+│   ├── catalog.ts   # 11 個部位與預設課表
+│   ├── week.ts
+│   └── week.test.ts
+├── lib/
+│   ├── firebase.ts  # 匿名登入 / Google 綁定
+│   ├── store.ts     # 本機優先，雲端次之
+│   └── useWorkout.ts
+├── App.tsx
+└── App.test.tsx     # 使用者流程測試
+```
+
+所有狀態變更都是不可變的——`domain/` 裡的函式一律回傳新物件，不改參數。
+
+## 測試
+
+49 個測試，分兩層：
+
+- `domain/week.test.ts` — 週次邊界（跨年 ISO 週）、打勾、替換的補做池規則、進度計算
+- `App.test.tsx` — 真實點擊流程：打勾、整段打勾、替換、新增、週切換、模板套用
+
+瀏覽器端另外跑過 25 項 round-trip（含破版、深色模式、320px 窄螢幕、
+重新整理後資料保留）。

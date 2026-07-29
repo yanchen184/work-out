@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 環境變數（含 Firebase 金鑰，不進版控）
+.env
+.env.*
+!.env.example
