@@ -11,11 +11,18 @@
 專案名 + 一句話定位、功能清單、驗收標準逐條 ✅/⚠️（沒真的驗過不准打 ✅）、
 進度與線上網址、最後更新的絕對日期。
 
+## 線上位置
+
+- repo：https://github.com/yanchen184/work-out
+- 線上版：https://yanchen184.github.io/work-out/（push main 自動部署，`.github/workflows/deploy.yml`）
+- Firebase 專案：`work-out-yc`
+
 ## 目前未完成（更新狀態頁時記得對帳）
 
-- **雲端同步**：Firebase 程式已接好且可編譯，但沒建過 Firebase 專案，
-  沒做過線上 round-trip → 狀態頁維持 ⚠️，不准改 ✅。
-- **線上部署**：尚無 GitHub repo 與 Hosting。建 repo 屬對外動作，需尊上授權。
+- **匿名登入未啟用**：Firestore 與安全規則已部署且實測擋得住未授權寫入，
+  但 Authentication 還沒初始化 — 新專案要在 Firebase Console 的 Authentication
+  頁點一次「開始使用」再啟用「匿名」，CLI 與 API 都做不到（API 會被導向要收費的
+  Identity Platform）。**在真的跨裝置同步驗過之前，狀態頁的雲端同步維持 ⚠️，不准改 ✅。**
 
 ## 這個專案的設計前提
 

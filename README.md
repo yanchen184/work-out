@@ -2,6 +2,8 @@
 
 一頁式的每週健身打勾紀錄。7 天 × 早／晚時段，點一下就打勾，排錯了可以當週替換或直接改模板。
 
+**線上版：https://yanchen184.github.io/work-out/**
+
 ![每週健身主畫面](docs/images/01-home.png)
 
 ## 為什麼是這樣設計
@@ -68,6 +70,17 @@ npm run build
 `VITE_FIREBASE_APP_ID` 這幾個環境變數（寫在 `.env.local`，不進版控）。
 
 開啟後自動匿名登入；想換手機時在頁面底部綁定 Google 帳號即可帶著資料走。
+
+專案 `work-out-yc` 已建好，Firestore 與安全規則（`firestore.rules`：每人只能讀寫
+自己 `users/{uid}` 底下的資料）已部署。**匿名登入尚未啟用** — 新專案的
+Authentication 要先在 Firebase Console 的 Authentication 頁點一次「開始使用」
+才會初始化，CLI 沒有對應指令。點開並啟用「匿名」後，跨裝置同步才會生效。
+
+安全規則改動後重新部署：
+
+```bash
+firebase deploy --only firestore:rules --project work-out-yc
+```
 
 ## 結構
 
