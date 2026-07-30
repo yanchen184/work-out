@@ -382,3 +382,40 @@ export function overallProgress(plan: WeekPlan): { done: number; total: number }
 }
 
 export { emptySchedule }
+
+/** ---------- 多裝置合併 ---------- */
+
+/**
+ * 合併兩台裝置的同一週資料。
+ *
+ * 為什麼不能只比 updatedAt：那是整份文件的 last-write-wins。實測過——
+ * 手機離線打「週一早上」、電腦離線打「週二早上」，後同步的那台會把先同步的
+ * 整份蓋掉，先打的那個勾就這樣消失，而且使用者完全沒有感覺。打勾代表真的做過
+ * 的訓練，掉一個就是掉一次紀錄。
+ *
+ * 所以 `checked` 用聯集：兩台各打各的都留著。
+ *
+ * 代價要講清楚：聯集之下「取消打勾」可能被另一台的舊資料復活——A 取消了勾，
+ * 但 B 手上還有那個勾，合併後又出現。這是**刻意的取捨**：漏掉真的做過的訓練，
+ * 比多出一個可以再點掉的勾嚴重得多。
+ *
+ * `schedule` 與 `makeups` 仍走 last-write-wins：它們是整體排版，
+ * 逐項合併會生出兩台都沒排過的第三種課表，比直接取較新的更難理解。
+ */
+export function mergeWeekPlans(a: WeekPlan, b: WeekPlan): WeekPlan {
+  const newer = b.updatedAt >= a.updatedAt ? b : a
+  const merged = [...new Set([...a.checked, ...b.checked])]
+
+  // 只留還排在課表上、或還欠著補做的勾——被移除的項目不該靠合併復活
+  const alive = new Set<string>()
+  for (const day of [0, 1, 2, 3, 4, 5, 6] as DayIndex[]) {
+    for (const slot of ['morning', 'evening'] as SlotKey[]) {
+      for (const groupId of newer.schedule[day][slot]) alive.add(checkKey(day, slot, groupId))
+    }
+  }
+  for (const m of newer.makeups) alive.add(checkKey(m.fromDay, m.fromSlot, m.groupId))
+
+  const checked = merged.filter((k) => alive.has(k))
+
+  return { ...newer, checked }
+}

@@ -4,7 +4,7 @@ export type { UserId } from './firebase'
 import type { Schedule, Template, WeekPlan } from '../domain/types'
 import { isTemplate, isWeekPlan } from './schema'
 import { defaultSchedule } from '../domain/catalog'
-import { createWeekPlan } from '../domain/week'
+import { createWeekPlan, mergeWeekPlans } from '../domain/week'
 import { dequeue, enqueue, flushQueue, queueSize, type PendingWrite } from './syncQueue'
 
 const LOCAL_PREFIX = 'workout'
@@ -129,9 +129,18 @@ export async function loadWeek(
         const remote: unknown = snap.data()
         if (!isWeekPlan(remote)) {
           console.warn('雲端週計畫格式不正確，改用本機資料')
-        } else if (!local || remote.updatedAt >= local.updatedAt) {
-          writeLocal(localWeekKey(uid, weekKey), remote)
-          return remote
+        } else {
+          /**
+           * 合併，不是二選一。兩台裝置各自離線打不同的勾時，單純取較新的那份
+           * 會把另一台的勾整份蓋掉（實測過，勾就這樣消失）。見 mergeWeekPlans。
+           */
+          const merged = local ? mergeWeekPlans(local, remote) : remote
+          writeLocal(localWeekKey(uid, weekKey), merged)
+          // 合併後跟雲端不一樣 = 本機有雲端沒有的勾，推回去補上
+          if (local && merged.checked.length !== remote.checked.length) {
+            void saveWeek(uid, merged)
+          }
+          return merged
         }
       }
     } catch (error: unknown) {
@@ -153,6 +162,33 @@ export function saveWeekLocal(uid: string, plan: WeekPlan): void {
   writeLocal(localWeekKey(uid, plan.weekKey), plan)
 }
 
+/**
+ * 把一份週計畫寫上雲端，寫之前先把雲端現況合併進來。
+ *
+ * 為什麼不能直接 `setDoc(plan)`：那是整份文件的 last-write-wins。兩台裝置
+ * 各自離線打不同的勾時，後寫的那份會把先寫的整份蓋掉——實測過，A 打的勾
+ * 就這樣消失（見 mergeWeekPlans 的註解）。所以每次上雲都要 read-merge-write。
+ *
+ * 這條路徑同時給「即時寫入」與「離線佇列補送」用，兩邊都得合併，
+ * 否則補送的那筆一樣會把別台的勾洗掉。
+ */
+async function pushWeek(uid: string, plan: WeekPlan): Promise<WeekPlan> {
+  if (!db) throw new Error('Firestore 未初始化')
+
+  const ref = doc(db, 'users', uid, 'weeks', plan.weekKey)
+  let payload = plan
+
+  const snap = await getDoc(ref)
+  if (snap.exists()) {
+    const remote: unknown = snap.data()
+    if (isWeekPlan(remote)) payload = mergeWeekPlans(remote, plan)
+  }
+
+  await setDoc(ref, payload)
+  writeLocal(localWeekKey(uid, payload.weekKey), payload)
+  return payload
+}
+
 export async function saveWeek(uid: string, plan: WeekPlan): Promise<void> {
   writeLocal(localWeekKey(uid, plan.weekKey), plan)
 
@@ -170,7 +206,7 @@ export async function saveWeek(uid: string, plan: WeekPlan): Promise<void> {
     const item: PendingWrite = { kind: 'week', uid, weekKey: plan.weekKey, payload: plan }
     enqueue(item)
     try {
-      await setDoc(doc(db, 'users', uid, 'weeks', plan.weekKey), plan)
+      await pushWeek(uid, plan)
       dequeue(item)
       setCloudOk(true)
     } catch (error: unknown) {
@@ -182,16 +218,25 @@ export async function saveWeek(uid: string, plan: WeekPlan): Promise<void> {
 
 /** ---------- 待同步佇列 ---------- */
 
-/** 把一筆待同步的寫入真的送上 Firestore */
+/**
+ * 把一筆待同步的寫入真的送上 Firestore。
+ *
+ * 週計畫要先讀回雲端現況再合併：這筆是離線期間排隊的，排隊這段時間另一台
+ * 裝置可能已經打了別的勾。直接蓋上去等於把對方的勾洗掉——正是 mergeWeekPlans
+ * 要解決的那個問題，補送這條路徑同樣得走。
+ */
 async function sendPending(item: PendingWrite): Promise<void> {
   if (!db) throw new Error('Firestore 未初始化')
 
-  const ref =
-    item.kind === 'week'
-      ? doc(db, 'users', item.uid, 'weeks', item.weekKey as string)
-      : doc(db, 'users', item.uid, 'meta', 'template')
+  if (item.kind === 'template') {
+    await setDoc(
+      doc(db, 'users', item.uid, 'meta', 'template'),
+      item.payload as Record<string, unknown>,
+    )
+    return
+  }
 
-  await setDoc(ref, item.payload as Record<string, unknown>)
+  await pushWeek(item.uid, item.payload as WeekPlan)
 }
 
 /**

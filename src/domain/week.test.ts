@@ -5,6 +5,7 @@ import {
   dismissMakeup,
   dropToMakeup,
   formatWeekRange,
+  mergeWeekPlans,
   mondayOfWeekKey,
   moveGroup,
   overallProgress,
@@ -412,5 +413,70 @@ describe('dropToMakeup — 手上的項目放到空白處 → 進補做', () => 
     const once = dropToMakeup(plan, 'back', 1, 'evening')
     const twice = dropToMakeup(once, 'back', 1, 'evening')
     expect(twice.makeups.filter((m) => m.groupId === 'back')).toHaveLength(1)
+  })
+})
+
+describe('mergeWeekPlans — 兩台裝置各自離線打勾', () => {
+  const base = createWeekPlan('2026-W31', defaultSchedule())
+
+  it('兩台打不同的勾 → 聯集，兩個都留著', () => {
+    // 這正是實測會掉資料的情境：手機打週一早上、電腦打週二早上
+    const a = { ...toggleCheck(base, 0, 'morning', 'arms'), updatedAt: 1000 }
+    const b = { ...toggleCheck(base, 1, 'morning', 'hiit'), updatedAt: 2000 }
+
+    const merged = mergeWeekPlans(a, b)
+    expect(merged.checked).toContain(checkKey(0, 'morning', 'arms'))
+    expect(merged.checked).toContain(checkKey(1, 'morning', 'hiit'))
+  })
+
+  it('合併順序不影響結果（誰先誰後都一樣）', () => {
+    const a = { ...toggleCheck(base, 0, 'morning', 'arms'), updatedAt: 1000 }
+    const b = { ...toggleCheck(base, 1, 'morning', 'hiit'), updatedAt: 2000 }
+
+    expect([...mergeWeekPlans(a, b).checked].sort()).toEqual(
+      [...mergeWeekPlans(b, a).checked].sort(),
+    )
+  })
+
+  it('兩台打同一個勾 → 不會變成兩筆', () => {
+    const a = { ...toggleCheck(base, 0, 'morning', 'arms'), updatedAt: 1000 }
+    const b = { ...toggleCheck(base, 0, 'morning', 'arms'), updatedAt: 2000 }
+
+    expect(mergeWeekPlans(a, b).checked).toEqual([checkKey(0, 'morning', 'arms')])
+  })
+
+  it('schedule 取較新的那份（整體排版不逐項合併）', () => {
+    const a = { ...base, updatedAt: 1000 }
+    const b = { ...removeFromSlot(base, 3, 'evening', 'basketball'), updatedAt: 2000 }
+
+    expect(mergeWeekPlans(a, b).schedule[3].evening).not.toContain('basketball')
+  })
+
+  it('較新那份已經移除的項目 → 舊的勾不會靠合併復活', () => {
+    // A 打了籃球的勾；B 之後把籃球整個從課表移掉（也沒進補做池）
+    const a = { ...toggleCheck(base, 3, 'evening', 'basketball'), updatedAt: 1000 }
+    const removed = removeFromSlot(base, 3, 'evening', 'basketball')
+    const b = { ...removed, makeups: [], updatedAt: 2000 }
+
+    expect(mergeWeekPlans(a, b).checked).not.toContain(checkKey(3, 'evening', 'basketball'))
+  })
+
+  it('項目被換走但還欠在補做池 → 那個勾要留著', () => {
+    const a = { ...toggleCheck(base, 1, 'evening', 'back'), updatedAt: 1000 }
+    const b = { ...dropToMakeup(base, 'back', 1, 'evening'), updatedAt: 2000 }
+
+    const merged = mergeWeekPlans(a, b)
+    expect(merged.checked).toContain(checkKey(1, 'evening', 'back'))
+  })
+
+  it('不改動傳進來的兩份計畫（immutability）', () => {
+    const a = { ...toggleCheck(base, 0, 'morning', 'arms'), updatedAt: 1000 }
+    const b = { ...toggleCheck(base, 1, 'morning', 'hiit'), updatedAt: 2000 }
+    const aBefore = [...a.checked]
+    const bBefore = [...b.checked]
+
+    mergeWeekPlans(a, b)
+    expect(a.checked).toEqual(aBefore)
+    expect(b.checked).toEqual(bBefore)
   })
 })
