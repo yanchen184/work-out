@@ -14,7 +14,11 @@
 ## 線上位置
 
 - repo：https://github.com/yanchen184/work-out
-- 線上版：https://yanchen184.github.io/work-out/（push main 自動部署，`.github/workflows/deploy.yml`）
+- 線上版：https://work.yanchen.app/（push main 自動部署，`.github/workflows/deploy.yml`）
+  - 自訂網域，Cloudflare CNAME `work` → `yanchen184.github.io`（unproxied，GitHub 要自己發 TLS 憑證，
+    開 proxy 會讓憑證發不出來）。網域寫在 `public/CNAME`，**刪掉那個檔會讓自訂網域失效**。
+  - 因此 `vite.config.ts` 的 `base` 必須是 `/`，不能是 `/work-out/`：設了自訂網域後
+    `yanchen184.github.io/work-out/` 會 301 轉來這裡，兩邊都從根目錄供應，帶子路徑會讓 JS/CSS 404。
 - Firebase 專案：`work-out-yc`
 
 ## 帳號模型（2026-07-29 定案，別再自作主張加回登入）

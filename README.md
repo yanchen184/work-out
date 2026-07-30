@@ -2,7 +2,7 @@
 
 一頁式的每週健身打勾紀錄。7 天 × 早／晚時段，點一下就打勾，排錯了可以當週替換或直接改模板。
 
-**線上版：https://yanchen184.github.io/work-out/**
+**線上版：https://work.yanchen.app/**
 
 ![每週健身主畫面](docs/images/01-home.png)
 
