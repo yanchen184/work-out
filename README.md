@@ -30,7 +30,7 @@
 | 週切換 | `‹ ›` 看前後幾週，每週資料各自獨立 |
 | 三個帳號 | 首次開啟選 `bob` / `user1` / `user2`，選過就記住；頁尾有小小的登出可換人 |
 | 跨裝置同步 | 同一個帳號在手機與電腦看到同一份資料（Firestore） |
-| 離線可用 | 資料先寫本機，雲端連不上照樣完整可用 |
+| 離線可用 | 資料先寫本機，雲端連不上照樣完整可用；欠的同步記在佇列裡，回線或下次開啟自動補送 |
 | 加到主畫面 | PWA：Safari 分享 → 加入主畫面，全螢幕、沒有網址列、離線可開 |
 
 ## 畫面
@@ -52,6 +52,11 @@
 Service worker（Workbox）只預快取 JS/CSS/HTML，Firestore 一律走網路不快取——
 快取住反而會讀到舊資料。
 
+離線期間的改動會記進待同步佇列（存在 `localStorage`，關掉 app 也還在），
+回線、頁面重新可見、或下次開啟時自動補送。**注意**：離線改完就關掉 app，
+那筆是靠「這台裝置下次開啟」補送的——關頁當下沒網路，物理上送不出去。
+這台永遠不再開的話，改動就只留在這台本機。這是離線優先架構的固有限制。
+
 ## 每週配額
 
 | 部位 | 目標 | 時段數 |
@@ -71,10 +76,14 @@ Service worker（Workbox）只預快取 JS/CSS/HTML，Firestore 一律走網路�
 
 ## 開發
 
+**Node 22.12.0**（版本寫在 `.nvmrc`，CI 也讀同一個檔）。用 nvm 的話 `nvm use` 就會切好。
+`package.json` 的 `engines` 允許 `>=22.12.0 <25`，22 與 24 都實測跑得起來。
+
 ```bash
+nvm use          # 讀 .nvmrc
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 69 個測試
+npm test         # 106 個測試
 npm run build
 ```
 
@@ -114,6 +123,8 @@ src/
 ├── lib/
 │   ├── firebase.ts  # Firestore 初始化 + 三個固定帳號
 │   ├── store.ts     # 本機優先，雲端次之
+│   ├── schema.ts    # 雲端／本機資料讀入前的型別守衛
+│   ├── syncQueue.ts # 離線待同步佇列（write-ahead）
 │   ├── useDrag.ts   # pointer events 拖曳（長按拿起、移動取消）
 │   └── useWorkout.ts
 ├── App.tsx
@@ -124,9 +135,11 @@ src/
 
 ## 測試
 
-69 個測試，分兩層：
+106 個測試：
 
 - `domain/week.test.ts` — 週次邊界（跨年 ISO 週）、打勾、替換的補做池規則、進度計算
+- `lib/syncQueue.test.ts` — 佇列去重、送達才移除、送出期間又改動、部分失敗、併發 flush
+- `lib/schema.test.ts` — 型別守衛：缺天／缺時段／混型別／半截文件／欄位越界
 - `App.test.tsx` — 真實點擊流程：打勾、拖曳換位置、補做池、週切換、模板存取、
   選人／記住／登出、不同帳號資料隔離，以及「雲端沒真的連上時，頁尾不能謊稱已同步」
 
@@ -135,5 +148,10 @@ src/
 service worker 預快取、斷網後照樣打勾），以及跨裝置同步驗證：用兩個獨立的
 瀏覽器 context（各自空的 localStorage = 兩台裝置）互相確認打勾真的傳得過去、
 傳得回來，且 `user2` 的改動不會污染 `bob`。
+
+離線同步另外實測兩條路徑：**離線改 → 關掉 app → 重開補送 → 另一台讀到**，
+以及 **離線改 → 回線補送 → 另一台讀到**，兩條都從另一台裝置的畫面確認收到。
+（實測發現：離線時 `setDoc` 不會 reject，Firestore SDK 把它收進記憶體緩衝，
+所以「失敗才記帳」的寫法是死碼——佇列必須在送出前就記帳。）
 
 專案狀態頁：https://html.yanchen.app/work-out/

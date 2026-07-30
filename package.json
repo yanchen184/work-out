@@ -1,6 +1,9 @@
 {
   "name": "work-out",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0 <25"
+  },
   "version": "0.0.0",
   "type": "module",
   "scripts": {
