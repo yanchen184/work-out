@@ -2,6 +2,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db, firebaseEnabled } from './firebase'
 export type { UserId } from './firebase'
 import type { Schedule, Template, WeekPlan } from '../domain/types'
+import { isTemplate, isWeekPlan } from './schema'
 import { defaultSchedule } from '../domain/catalog'
 import { createWeekPlan } from '../domain/week'
 import { dequeue, enqueue, flushQueue, queueSize, type PendingWrite } from './syncQueue'
@@ -16,10 +17,16 @@ function localTemplateKey(uid: string): string {
   return `${LOCAL_PREFIX}:${uid}:template`
 }
 
-function readLocal<T>(key: string): T | null {
+/**
+ * 讀本機資料。同樣要驗形狀：舊版本存的舊格式、寫到一半被中斷的半截 JSON
+ * 都會讓 domain/ 的純函式收到不該有的東西。驗不過就當沒有，讓上層重建。
+ */
+function readLocal<T>(key: string, guard: (value: unknown) => value is T): T | null {
   try {
     const raw = localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : null
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    return guard(parsed) ? parsed : null
   } catch {
     return null
   }
@@ -60,16 +67,19 @@ export function watchCloud(listener: (ok: boolean) => void): () => void {
 /** ---------- 模板 ---------- */
 
 export async function loadTemplate(uid: string): Promise<Template> {
-  const local = readLocal<Template>(localTemplateKey(uid))
+  const local = readLocal(localTemplateKey(uid), isTemplate)
 
   if (firebaseEnabled && db) {
     try {
       const snap = await getDoc(doc(db, 'users', uid, 'meta', 'template'))
       setCloudOk(true)
       if (snap.exists()) {
-        const remote = snap.data() as Template
-        // 取較新的那份
-        if (!local || remote.updatedAt >= local.updatedAt) {
+        const remote: unknown = snap.data()
+        // 形狀不對就當它不存在，退回本機——髒資料流進 domain/ 會讓畫面莫名爆掉
+        if (!isTemplate(remote)) {
+          console.warn('雲端模板格式不正確，改用本機資料')
+        } else if (!local || remote.updatedAt >= local.updatedAt) {
+          // 取較新的那份
           writeLocal(localTemplateKey(uid), remote)
           return remote
         }
@@ -109,15 +119,17 @@ export async function loadWeek(
   weekKey: string,
   fallbackSchedule: Schedule,
 ): Promise<WeekPlan> {
-  const local = readLocal<WeekPlan>(localWeekKey(uid, weekKey))
+  const local = readLocal(localWeekKey(uid, weekKey), isWeekPlan)
 
   if (firebaseEnabled && db) {
     try {
       const snap = await getDoc(doc(db, 'users', uid, 'weeks', weekKey))
       setCloudOk(true)
       if (snap.exists()) {
-        const remote = snap.data() as WeekPlan
-        if (!local || remote.updatedAt >= local.updatedAt) {
+        const remote: unknown = snap.data()
+        if (!isWeekPlan(remote)) {
+          console.warn('雲端週計畫格式不正確，改用本機資料')
+        } else if (!local || remote.updatedAt >= local.updatedAt) {
           writeLocal(localWeekKey(uid, weekKey), remote)
           return remote
         }
