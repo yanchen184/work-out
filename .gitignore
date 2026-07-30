@@ -30,3 +30,6 @@ dist-ssr
 
 # Claude Code session state
 .claude/
+
+# codex 產圖的原始大圖（只會撐大 bundle，不進版控）
+.plan-assets/

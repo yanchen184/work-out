@@ -1,9 +1,13 @@
 # 每週健身
 
+![每週健身](docs/images/readme-hero.jpg)
+
 一頁式的每週健身打勾紀錄。7 天 × 早／晚時段一屏看完，點一下就打勾，
 排錯了就把方塊**拿起來換位置**。可以加到 iPhone 主畫面當 app 用，離線照樣打勾。
 
 **線上版：https://work.yanchen.app/**
+
+實際畫面：
 
 ![每週健身主畫面](docs/images/readme-main-light.png)
 
