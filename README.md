@@ -32,6 +32,7 @@
 | 跨裝置同步 | 同一個帳號在手機與電腦看到同一份資料（Firestore） |
 | 離線可用 | 資料先寫本機，雲端連不上照樣完整可用；欠的同步記在佇列裡，回線或下次開啟自動補送 |
 | 加到主畫面 | PWA：Safari 分享 → 加入主畫面，全螢幕、沒有網址列、離線可開 |
+| 鍵盤可用 | Tab 走到方塊、Enter／空白鍵打勾；拉盤按 Esc 關閉，焦點會關進拉盤裡再還回原按鈕 |
 
 ## 畫面
 
@@ -88,7 +89,7 @@ Service worker（Workbox）只預快取 JS/CSS/HTML，Firestore 一律走網路�
 nvm use          # 讀 .nvmrc
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 129 個測試
+npm test         # 138 個測試
 npm run build
 ```
 
@@ -141,7 +142,7 @@ src/
 
 ## 測試
 
-129 個測試：
+138 個測試：
 
 - `domain/week.test.ts` — 週次邊界（跨年 ISO 週）、打勾、替換的補做池規則、進度計算
 - `lib/syncQueue.test.ts` — 佇列去重、送達才移除、送出期間又改動、部分失敗、併發 flush
@@ -150,6 +151,8 @@ src/
 - `lib/schema.test.ts` — 型別守衛：缺天／缺時段／混型別／半截文件／欄位越界
 - `App.test.tsx` — 真實點擊流程：打勾、拖曳換位置、補做池、週切換、模板存取、
   選人／記住／登出、不同帳號資料隔離，以及「雲端沒真的連上時，頁尾不能謊稱已同步」
+- `App.test.tsx`（鍵盤與 dialog）— Enter／空白鍵打勾、拉盤 Esc 關閉、焦點移入與還原、
+  Tab 不會逃出拉盤
 
 瀏覽器端另外跑過真實 round-trip：22 項手機版視覺與互動（含破版、深色模式、
 320px 窄螢幕、重新整理後資料保留）、15 項線上版 PWA 驗收（加到主畫面、

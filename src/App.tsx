@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
 import { useWorkout } from './lib/useWorkout'
 import { CATALOG, DAY_LABELS, groupById } from './domain/catalog'
@@ -272,7 +272,12 @@ export default function App() {
   )
 }
 
-/** 底部拉盤外殼：點背景或往下拉都可以關 */
+/**
+ * 底部拉盤外殼：點背景或往下拉都可以關，鍵盤按 Esc 也可以。
+ *
+ * 開啟時把焦點移進拉盤、Tab 在裡面繞（focus trap），關閉時還給原本那顆按鈕。
+ * 少了這幾件事，鍵盤使用者會 tab 到蓋在底下、看不見也點不到的元素上。
+ */
 function Sheet({
   title,
   onClose,
@@ -282,10 +287,61 @@ function Sheet({
   onClose: () => void
   children: React.ReactNode
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    // 記住開啟前焦點在哪，關閉時還回去
+    const opener = document.activeElement as HTMLElement | null
+    ref.current?.focus()
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (e.key !== 'Tab') return
+
+      const focusable = ref.current?.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable || focusable.length === 0) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      const active = document.activeElement
+
+      // 焦點跑到拉盤外（例如被底下的畫面接走）就拉回來
+      if (!ref.current?.contains(active)) {
+        e.preventDefault()
+        first.focus()
+      } else if (e.shiftKey && active === first) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      opener?.focus()
+    }
+  }, [onClose])
+
   return (
     <>
       <div className="sheet-back" onClick={onClose} />
-      <div className="sheet" role="dialog" aria-label={title}>
+      <div
+        className="sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        ref={ref}
+        tabIndex={-1}
+      >
         <button className="sheet-grip" onClick={onClose} aria-label="關閉" />
         <h2 className="sheet-title">{title}</h2>
         <div className="sheet-body">{children}</div>

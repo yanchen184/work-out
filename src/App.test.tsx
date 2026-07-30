@@ -365,3 +365,119 @@ describe('App — 選使用者', () => {
     expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
   })
 })
+
+/**
+ * 鍵盤與 dialog 無障礙。
+ *
+ * 這些不是「順手加的 aria」，是實測抓到的真缺口：方塊有 role="button" 也 tab 得到，
+ * 但 div 不會自己把 Enter/Space 轉成 click——鍵盤使用者根本打不了勾（app 的主要互動）。
+ * 拉盤同樣沒有 Esc、沒有 focus trap，tab 會跑到蓋在底下看不見的元素上。
+ */
+describe('App — 鍵盤操作', () => {
+  it('方塊 tab 得到，按 Enter 就打勾', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    const t = tile(0, 'morning', '二三頭')
+    t.focus()
+    expect(document.activeElement).toBe(t)
+
+    await user.keyboard('{Enter}')
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
+  })
+
+  it('按空白鍵也能打勾，而且不會捲動頁面', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    const t = tile(0, 'evening', '胸')
+    t.focus()
+    await user.keyboard(' ')
+    expect(tile(0, 'evening', '胸')).toHaveClass('is-done')
+  })
+
+  it('Enter 打完可以再按一次取消（跟滑鼠一致）', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    tile(0, 'morning', '二三頭').focus()
+    await user.keyboard('{Enter}')
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
+
+    tile(0, 'morning', '二三頭').focus()
+    await user.keyboard('{Enter}')
+    expect(tile(0, 'morning', '二三頭')).not.toHaveClass('is-done')
+  })
+
+  it('方塊有看得懂的 aria-label，打勾後會講出狀態', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    // 二三頭 週一與週四早上都有，所以要限定在某一格裡找
+    const mon = within(cell(0, 'morning'))
+    expect(mon.getByRole('button', { name: '二三頭' })).toBeTruthy()
+
+    await user.click(tile(0, 'morning', '二三頭'))
+    expect(mon.getByRole('button', { name: '二三頭（已完成）' })).toBeTruthy()
+    // 週四那顆不受影響，label 也不該跟著變
+    expect(within(cell(3, 'morning')).getByRole('button', { name: '二三頭' })).toBeTruthy()
+  })
+})
+
+describe('App — dialog 無障礙', () => {
+  it('按 Esc 可以關掉拉盤', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    await user.click(screen.getByText('部位進度'))
+    await screen.findByRole('dialog', { name: '部位進度' })
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('拉盤標成 aria-modal，讀屏才知道底下的東西被蓋住了', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    await user.click(screen.getByText('部位進度'))
+    const sheet = await screen.findByRole('dialog', { name: '部位進度' })
+    expect(sheet.getAttribute('aria-modal')).toBe('true')
+  })
+
+  it('打開拉盤時焦點會移進去，不會留在底下的畫面', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    await user.click(screen.getByText('每週模板'))
+    const sheet = await screen.findByRole('dialog', { name: '每週模板' })
+    expect(sheet.contains(document.activeElement)).toBe(true)
+  })
+
+  it('關掉拉盤後焦點回到原本那顆按鈕', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    const opener = screen.getByText('部位進度')
+    opener.focus()
+    await user.click(opener)
+    await screen.findByRole('dialog', { name: '部位進度' })
+
+    await user.keyboard('{Escape}')
+    expect(document.activeElement).toBe(opener)
+  })
+
+  it('Tab 在拉盤裡繞，不會跑到底下看不見的元素', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    await user.click(screen.getByText('每週模板'))
+    const sheet = await screen.findByRole('dialog', { name: '每週模板' })
+
+    // 連按幾次 Tab，焦點都該還在拉盤內
+    for (let i = 0; i < 6; i += 1) {
+      await user.tab()
+      expect(sheet.contains(document.activeElement)).toBe(true)
+    }
+  })
+})

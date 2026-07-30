@@ -60,6 +60,17 @@ export function Tile({
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onClick={onClick}
+      onKeyDown={
+        floating || !onClick
+          ? undefined
+          : (e) => {
+              // div 帶 role="button" 不會自己把 Enter/Space 轉成 click，
+              // 少了這段就只能 tab 過去、按不下去——鍵盤根本打不了勾。
+              if (e.key !== 'Enter' && e.key !== ' ') return
+              e.preventDefault() // Space 預設會捲動頁面
+              onClick()
+            }
+      }
       role={floating ? 'presentation' : 'button'}
       tabIndex={floating ? -1 : 0}
       aria-label={`${group.name}${done ? '（已完成）' : ''}`}
