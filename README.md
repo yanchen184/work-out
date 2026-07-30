@@ -57,6 +57,11 @@ Service worker（Workbox）只預快取 JS/CSS/HTML，Firestore 一律走網路�
 那筆是靠「這台裝置下次開啟」補送的——關頁當下沒網路，物理上送不出去。
 這台永遠不再開的話，改動就只留在這台本機。這是離線優先架構的固有限制。
 
+兩台同時離線、各打各的勾時，上雲一律是 **read-merge-write**：先讀回雲端現況再合併，
+`checked` 取聯集，兩台的勾都留著。之前是整份 last-write-wins，後同步的那台會把先同步的
+整份蓋掉——實測重現過，勾就這樣消失。代價是「取消打勾」可能被另一台的舊資料復活；
+漏掉真的做過的訓練，比多出一個可以再點掉的勾嚴重得多。
+
 ## 每週配額
 
 | 部位 | 目標 | 時段數 |
@@ -83,7 +88,7 @@ Service worker（Workbox）只預快取 JS/CSS/HTML，Firestore 一律走網路�
 nvm use          # 讀 .nvmrc
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 106 個測試
+npm test         # 129 個測試
 npm run build
 ```
 
@@ -122,7 +127,8 @@ src/
 │   └── week.test.ts
 ├── lib/
 │   ├── firebase.ts  # Firestore 初始化 + 三個固定帳號
-│   ├── store.ts     # 本機優先，雲端次之
+│   ├── store.ts     # 本機優先，雲端次之；上雲一律 read-merge-write
+│   ├── store.test.ts
 │   ├── schema.ts    # 雲端／本機資料讀入前的型別守衛
 │   ├── syncQueue.ts # 離線待同步佇列（write-ahead）
 │   ├── useDrag.ts   # pointer events 拖曳（長按拿起、移動取消）
@@ -135,10 +141,12 @@ src/
 
 ## 測試
 
-106 個測試：
+129 個測試：
 
 - `domain/week.test.ts` — 週次邊界（跨年 ISO 週）、打勾、替換的補做池規則、進度計算
 - `lib/syncQueue.test.ts` — 佇列去重、送達才移除、送出期間又改動、部分失敗、併發 flush
+- `lib/store.test.ts` — 雲端寫失敗留佇列、回線補送、補送前先合併、讀失敗退回本機、
+  雲端髒資料不採用（用假的 Firestore，可指定第幾次讀／寫爆掉）
 - `lib/schema.test.ts` — 型別守衛：缺天／缺時段／混型別／半截文件／欄位越界
 - `App.test.tsx` — 真實點擊流程：打勾、拖曳換位置、補做池、週切換、模板存取、
   選人／記住／登出、不同帳號資料隔離，以及「雲端沒真的連上時，頁尾不能謊稱已同步」
