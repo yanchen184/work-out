@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { render, screen, within, act, cleanup } from '@testing-library/react'
+import { render, screen, within, act, cleanup, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 
@@ -13,153 +13,256 @@ beforeEach(() => {
 
 /** 選好使用者並等 useWorkout 的非同步載入跑完 */
 async function renderApp(user = 'bob') {
-  // 沒選過使用者會先看到選人畫面，測試一律用 bob
   localStorage.setItem('workout:user', user)
   render(<App />)
   await screen.findByText('每週健身')
-  // 載入中 → 有資料
-  await screen.findByText('本週完成度')
+  // 載入中 → 有資料（格線出現代表課表已經載進來）
+  await screen.findByText('早上')
 }
 
-/** 取某一天的卡片（週一 = index 0） */
-function dayCard(label: string): HTMLElement {
-  const heading = screen.getByText(`週${label}`)
-  const card = heading.closest('article')
-  if (!card) throw new Error(`找不到週${label}的卡片`)
-  return card
+/** 取某一天某一格（週一 = 0） */
+function cell(day: number, slot: 'morning' | 'evening'): HTMLElement {
+  const el = document.querySelector(`[data-day="${day}"][data-slot="${slot}"]`)
+  if (!el) throw new Error(`找不到 day=${day} slot=${slot} 的格子`)
+  return el as HTMLElement
+}
+
+/** 取某一顆方塊 */
+function tile(day: number, slot: 'morning' | 'evening', name: string): HTMLElement {
+  return within(cell(day, slot)).getByText(name).closest('.tile') as HTMLElement
+}
+
+/**
+ * 模擬手指把某顆方塊拖到某一格。
+ * useDrag 是按住 180ms 才算拿起，所以要真的等過那個門檻。
+ */
+async function dragTo(
+  from: { day: number; slot: 'morning' | 'evening'; name: string },
+  to: { day: number; slot: 'morning' | 'evening'; onto?: string },
+) {
+  const source = tile(from.day, from.slot, from.name)
+  const target = cell(to.day, to.slot)
+
+  // jsdom 沒有版面，elementFromPoint 永遠回 null。
+  // 手指真的放下去時碰到的是「落點格」或「格內某顆方塊」，這裡照樣模擬。
+  const original = document.elementFromPoint
+  document.elementFromPoint = () =>
+    to.onto ? tile(to.day, to.slot, to.onto) : target
+
+  fireEvent.pointerDown(source, { clientX: 10, clientY: 10 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 220))
+  })
+  fireEvent.pointerMove(window, { clientX: 200, clientY: 300 })
+  await act(async () => {
+    fireEvent.pointerUp(window, { clientX: 200, clientY: 300 })
+  })
+
+  document.elementFromPoint = original
 }
 
 describe('App — 打勾', () => {
-  it('點部位會打勾，再點一次取消', async () => {
+  it('點方塊會打勾，再點一次取消', async () => {
     const user = userEvent.setup()
     await renderApp()
 
-    const mon = dayCard('一')
-    // 週一早上第一個是「二三頭」
-    const arms = within(mon).getAllByTitle('點擊打勾')[0]
-    expect(arms.closest('.pill')).not.toHaveClass('is-done')
+    // 週一早上預設有 二三頭 / 胸 / 肩
+    expect(tile(0, 'morning', '二三頭')).not.toHaveClass('is-done')
 
-    await user.click(arms)
-    expect(within(mon).getAllByTitle('點擊打勾')[0].closest('.pill')).toHaveClass('is-done')
+    await user.click(tile(0, 'morning', '二三頭'))
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
 
-    await user.click(within(mon).getAllByTitle('點擊打勾')[0])
-    expect(within(mon).getAllByTitle('點擊打勾')[0].closest('.pill')).not.toHaveClass(
-      'is-done',
-    )
+    await user.click(tile(0, 'morning', '二三頭'))
+    expect(tile(0, 'morning', '二三頭')).not.toHaveClass('is-done')
   })
 
-  it('整段完成鈕會把該時段所有部位一次打勾', async () => {
+  it('打勾會反映到總進度百分比', async () => {
     const user = userEvent.setup()
     await renderApp()
 
-    const mon = dayCard('一')
-    // 週一早上 = 二三頭 / 胸 / 肩 三項
-    expect(within(mon).getAllByTitle('點擊打勾')).toHaveLength(3)
-
-    await user.click(within(mon).getByTitle('整段標記完成'))
-
-    const pills = within(mon)
-      .getAllByTitle('點擊打勾')
-      .map((b) => b.closest('.pill'))
-    for (const pill of pills) {
-      expect(pill).toHaveClass('is-done')
-    }
-    // 日計數應該是 3/3
-    expect(within(mon).getByText('3/3')).toBeTruthy()
-  })
-
-  it('整段完成後再點一次，會把該時段全部取消', async () => {
-    const user = userEvent.setup()
-    await renderApp()
-
-    const mon = dayCard('一')
-    await user.click(within(mon).getByTitle('整段標記完成'))
-    await user.click(within(mon).getByTitle('取消整段完成'))
-
-    const pills = within(mon)
-      .getAllByTitle('點擊打勾')
-      .map((b) => b.closest('.pill'))
-    for (const pill of pills) {
-      expect(pill).not.toHaveClass('is-done')
-    }
-    expect(within(mon).getByText('0/3')).toBeTruthy()
+    expect(screen.getByText('0%')).toBeTruthy()
+    await user.click(tile(0, 'morning', '二三頭'))
+    expect(screen.queryByText('0%')).toBeNull()
   })
 })
 
-describe('App — 替換與補做池', () => {
-  it('把沒打勾的項目換掉，會進補做池', async () => {
-    const user = userEvent.setup()
+describe('App — 拖放', () => {
+  it('拖到空格＝單純搬過去，原本那格就沒了', async () => {
     await renderApp()
 
-    const mon = dayCard('一')
-    await user.click(within(mon).getByLabelText('更換或移除二三頭'))
+    // 週一晚上是空的
+    expect(within(cell(0, 'evening')).queryByText('胸')).toBeNull()
 
-    // 選單開啟
-    await screen.findByText('更換「二三頭」')
-    const sheet = document.querySelector('.sheet') as HTMLElement
-    await user.click(within(sheet).getByText('壁球').closest('button') as HTMLElement)
+    await dragTo({ day: 0, slot: 'morning', name: '胸' }, { day: 0, slot: 'evening' })
 
-    // 週一早上現在有壁球、沒有二三頭
-    expect(within(dayCard('一')).getByText('壁球')).toBeTruthy()
-    expect(within(dayCard('一')).queryByText('二三頭')).toBeNull()
-
-    // 補做池出現二三頭
-    const makeup = document.querySelector('.makeup') as HTMLElement
-    expect(makeup).toBeTruthy()
-    expect(within(makeup).getByText('二三頭')).toBeTruthy()
-  })
-
-  it('已打勾的項目換掉，不會進補做池', async () => {
-    const user = userEvent.setup()
-    await renderApp()
-
-    const mon = dayCard('一')
-    await user.click(within(mon).getAllByTitle('點擊打勾')[0]) // 打勾二三頭
-    await user.click(within(dayCard('一')).getByLabelText('更換或移除二三頭'))
-
-    await screen.findByText('更換「二三頭」')
-    const sheet = document.querySelector('.sheet') as HTMLElement
-    await user.click(within(sheet).getByText('壁球').closest('button') as HTMLElement)
-
+    expect(within(cell(0, 'evening')).getByText('胸')).toBeTruthy()
+    expect(within(cell(0, 'morning')).queryByText('胸')).toBeNull()
+    // 單純搬移不算欠，不進補做
     expect(document.querySelector('.makeup')).toBeNull()
   })
 
-  it('可以從一格移除項目', async () => {
+  it('打過勾的方塊被搬走，勾要跟著走', async () => {
     const user = userEvent.setup()
     await renderApp()
 
-    await user.click(within(dayCard('一')).getByLabelText('更換或移除胸'))
-    await screen.findByText('更換「胸」')
-    await user.click(screen.getByText('從這一格移除'))
+    await user.click(tile(0, 'morning', '胸'))
+    expect(tile(0, 'morning', '胸')).toHaveClass('is-done')
 
-    expect(within(dayCard('一')).queryByText('胸')).toBeNull()
+    await dragTo({ day: 0, slot: 'morning', name: '胸' }, { day: 0, slot: 'evening' })
+
+    expect(tile(0, 'evening', '胸')).toHaveClass('is-done')
   })
 
+  it('同一個部位出現在多天時，凹槽只留在被拿走的那一格', async () => {
+    await renderApp()
+
+    // 二三頭 同時在週一早上與週四早上。拿起週一那顆，週四那顆不該跟著變凹槽。
+    const source = tile(0, 'morning', '二三頭')
+    const original = document.elementFromPoint
+    document.elementFromPoint = () => cell(0, 'evening')
+
+    fireEvent.pointerDown(source, { clientX: 10, clientY: 10 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 220))
+    })
+
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-ghost')
+    expect(tile(3, 'morning', '二三頭')).not.toHaveClass('is-ghost')
+
+    await act(async () => {
+      fireEvent.pointerUp(window, { clientX: 200, clientY: 300 })
+    })
+    document.elementFromPoint = original
+  })
+
+  it('拖到有東西的格子＝交換，被頂出來的黏在手上', async () => {
+    await renderApp()
+
+    // 週二早上有 間歇 / 背，放到「背」上面 → 頂掉背
+    await dragTo(
+      { day: 0, slot: 'morning', name: '胸' },
+      { day: 1, slot: 'morning', onto: '背' },
+    )
+
+    // 胸 進到週二早上
+    expect(within(cell(1, 'morning')).getByText('胸')).toBeTruthy()
+    // 被頂出來的那顆顯示在手上，還沒落地就不該進補做池
+    expect(screen.getByText(/在你手上/)).toBeTruthy()
+    expect(document.querySelector('.makeup')).toBeNull()
+  })
+})
+
+describe('App — 補做池', () => {
+  it('手上的方塊放到空白處 → 進補做', async () => {
+    await renderApp()
+
+    const source = tile(0, 'morning', '胸')
+    // elementFromPoint 回 null＝手指下面不是任何格子＝空白處
+    const original = document.elementFromPoint
+    document.elementFromPoint = () => null
+
+    fireEvent.pointerDown(source, { clientX: 10, clientY: 10 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 220))
+    })
+    await act(async () => {
+      fireEvent.pointerUp(window, { clientX: 5, clientY: 700 })
+    })
+    document.elementFromPoint = original
+
+    const makeup = document.querySelector('.makeup') as HTMLElement
+    expect(makeup).toBeTruthy()
+    expect(within(makeup).getByText('胸')).toBeTruthy()
+  })
+
+  it('已打勾的丟到空白處不算欠，不進補做', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    await user.click(tile(0, 'morning', '胸'))
+
+    const source = tile(0, 'morning', '胸')
+    const original = document.elementFromPoint
+    document.elementFromPoint = () => null
+
+    fireEvent.pointerDown(source, { clientX: 10, clientY: 10 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 220))
+    })
+    await act(async () => {
+      fireEvent.pointerUp(window, { clientX: 5, clientY: 700 })
+    })
+    document.elementFromPoint = original
+
+    expect(document.querySelector('.makeup')).toBeNull()
+  })
+})
+
+describe('App — 新增項目', () => {
   it('可以新增項目到空的晚上時段', async () => {
     const user = userEvent.setup()
     await renderApp()
 
-    const mon = dayCard('一')
-    await user.click(within(mon).getByLabelText('在週一晚上新增項目'))
-    await screen.findByText('新增到 週一晚上')
+    await user.click(within(cell(0, 'evening')).getByLabelText('加入訓練'))
+    await screen.findByText('加入訓練')
 
     const sheet = document.querySelector('.sheet') as HTMLElement
-    await user.click(within(sheet).getByText('腳踏車').closest('button') as HTMLElement)
+    await user.click(within(sheet).getByText('腳踏車'))
 
-    expect(within(dayCard('一')).getByText('腳踏車')).toBeTruthy()
+    expect(within(cell(0, 'evening')).getByText('腳踏車')).toBeTruthy()
   })
 })
 
-describe('App — 週切換與模板', () => {
-  it('切到上一週會顯示回本週鈕，點了回到本週', async () => {
+describe('App — 底部拉盤', () => {
+  it('部位進度拉盤打得開，主畫面還在', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    await user.click(screen.getByText('部位進度'))
+    const sheet = await screen.findByRole('dialog', { name: '部位進度' })
+    expect(sheet).toBeTruthy()
+    // 拉盤上來時主畫面沒有被換掉
+    expect(screen.getByText('每週健身')).toBeTruthy()
+
+    await user.click(screen.getByLabelText('關閉'))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('每週模板拉盤可以把這週存成模板，之後的週沿用', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    // 先把週一早上的胸搬到晚上，讓這週跟預設模板不一樣
+    await dragTo({ day: 0, slot: 'morning', name: '胸' }, { day: 0, slot: 'evening' })
+
+    await user.click(screen.getByText('每週模板'))
+    await user.click(await screen.findByText('把這週存成模板'))
+
+    // 下一週（尚未建立）應該用新模板生成
+    await user.click(screen.getByLabelText('下一週'))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(within(cell(0, 'evening')).getByText('胸')).toBeTruthy()
+  })
+})
+
+describe('App — 週切換', () => {
+  it('切到上一週再切回本週', async () => {
     const user = userEvent.setup()
     await renderApp()
 
     expect(screen.getByText('本週')).toBeTruthy()
     await user.click(screen.getByLabelText('上一週'))
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(screen.queryByText('本週')).toBeNull()
 
-    const back = await screen.findByText('回本週')
-    await user.click(back)
+    await user.click(screen.getByLabelText('下一週'))
+    await act(async () => {
+      await Promise.resolve()
+    })
     expect(screen.getByText('本週')).toBeTruthy()
   })
 
@@ -167,66 +270,43 @@ describe('App — 週切換與模板', () => {
     const user = userEvent.setup()
     await renderApp()
 
-    await user.click(within(dayCard('一')).getAllByTitle('點擊打勾')[0])
-    expect(within(dayCard('一')).getByText('1/3')).toBeTruthy()
+    await user.click(tile(0, 'morning', '二三頭'))
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
 
     await user.click(screen.getByLabelText('上一週'))
     await act(async () => {
       await Promise.resolve()
     })
-    expect(within(dayCard('一')).getByText('0/3')).toBeTruthy()
+    expect(tile(0, 'morning', '二三頭')).not.toHaveClass('is-done')
   })
 
   it('切走再切回來，本週的勾原封不動', async () => {
     const user = userEvent.setup()
     await renderApp()
 
-    await user.click(within(dayCard('一')).getByTitle('整段標記完成'))
-    const before = screen.getByText(/格$/).textContent
+    await user.click(tile(0, 'morning', '二三頭'))
 
     await user.click(screen.getByLabelText('上一週'))
     await act(async () => {
       await Promise.resolve()
     })
-    await user.click(await screen.findByText('回本週'))
-    await act(async () => {
-      await Promise.resolve()
-    })
-
-    expect(screen.getByText(/格$/).textContent).toBe(before)
-    expect(within(dayCard('一')).getByText('3/3')).toBeTruthy()
-  })
-
-  it('模板模式改動會套到之後的每一週', async () => {
-    const user = userEvent.setup()
-    await renderApp()
-
-    await user.click(screen.getByLabelText('編輯模板'))
-    await screen.findByText('模板模式：改動會套用到往後每一週')
-
-    // 模板模式下點部位 = 開替換選單，不是打勾
-    await user.click(within(dayCard('二')).getByLabelText('更換或移除間歇'))
-    await screen.findByText('更換「間歇」')
-    const sheet = document.querySelector('.sheet') as HTMLElement
-    await user.click(within(sheet).getByText('腿').closest('button') as HTMLElement)
-
-    await user.click(screen.getByText('完成'))
-
-    // 下一週（尚未建立）應該用新模板生成
     await user.click(screen.getByLabelText('下一週'))
     await act(async () => {
       await Promise.resolve()
     })
-    expect(within(dayCard('二')).getByText('腿')).toBeTruthy()
-  })
 
-  it('雲端沒真的連上時，頁尾不能謊稱已同步', async () => {
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
+  })
+})
+
+describe('App — 同步狀態', () => {
+  it('雲端沒真的連上時，不能謊稱已同步', async () => {
     await renderApp()
 
     // 測試環境沒有 Firebase 設定 → 一定是本機模式。
     // 這條擋的是「設定填了就說已同步」那種只看 handshake 的寫法。
-    expect(screen.getByText('資料存在這台裝置')).toBeTruthy()
-    expect(screen.queryByText('資料已同步雲端')).toBeNull()
+    expect(screen.getByText('存在這台裝置')).toBeTruthy()
+    expect(screen.queryByText('已同步雲端')).toBeNull()
   })
 })
 
@@ -239,28 +319,28 @@ describe('App — 選使用者', () => {
       expect(screen.getByRole('button', { name })).toBeTruthy()
     }
     // 還沒選人不該看到課表
-    expect(screen.queryByText('本週完成度')).toBeNull()
+    expect(screen.queryByText('早上')).toBeNull()
   })
 
   it('選過之後會記住，重開不用再選', async () => {
     const user = userEvent.setup()
     render(<App />)
     await user.click(await screen.findByRole('button', { name: 'bob' }))
-    await screen.findByText('本週完成度')
+    await screen.findByText('早上')
     expect(localStorage.getItem('workout:user')).toBe('bob')
 
     // 重新掛載 = 關掉重開
     cleanup()
     render(<App />)
-    await screen.findByText('本週完成度')
+    await screen.findByText('早上')
     expect(screen.queryByText('選一個帳號，之後開啟就不用再選')).toBeNull()
   })
 
-  it('登出會回到選人畫面，並忘掉記住的帳號', async () => {
+  it('換人會回到選人畫面，並忘掉記住的帳號', async () => {
     const user = userEvent.setup()
     await renderApp()
 
-    await user.click(screen.getByRole('button', { name: '登出' }))
+    await user.click(screen.getByTitle('換人'))
     await screen.findByText('選一個帳號，之後開啟就不用再選')
     expect(localStorage.getItem('workout:user')).toBeNull()
   })
@@ -269,26 +349,19 @@ describe('App — 選使用者', () => {
     const user = userEvent.setup()
     await renderApp('user1')
 
-    // user1 在週一早上打第一個勾
-    await user.click(within(dayCard('一')).getAllByTitle('點擊打勾')[0])
-    expect(
-      within(dayCard('一')).getAllByTitle('點擊打勾')[0].closest('.pill'),
-    ).toHaveClass('is-done')
+    await user.click(tile(0, 'morning', '二三頭'))
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
 
     // 換成 user2 → 同一格應該是乾淨的
-    await user.click(screen.getByRole('button', { name: '登出' }))
+    await user.click(screen.getByTitle('換人'))
     await user.click(await screen.findByRole('button', { name: 'user2' }))
-    await screen.findByText('本週完成度')
-    expect(
-      within(dayCard('一')).getAllByTitle('點擊打勾')[0].closest('.pill'),
-    ).not.toHaveClass('is-done')
+    await screen.findByText('早上')
+    expect(tile(0, 'morning', '二三頭')).not.toHaveClass('is-done')
 
     // 切回 user1 → 勾還在
-    await user.click(screen.getByRole('button', { name: '登出' }))
+    await user.click(screen.getByTitle('換人'))
     await user.click(await screen.findByRole('button', { name: 'user1' }))
-    await screen.findByText('本週完成度')
-    expect(
-      within(dayCard('一')).getAllByTitle('點擊打勾')[0].closest('.pill'),
-    ).toHaveClass('is-done')
+    await screen.findByText('早上')
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
   })
 })

@@ -1,0 +1,79 @@
+import type { CSSProperties } from 'react'
+import type { MuscleGroup } from '../domain/types'
+
+export function unitLabel(amount: number, unit: string): string {
+  if (amount <= 0) return ''
+  if (unit === 'sets') return `${amount}組`
+  if (unit === 'minutes') return `${amount}分`
+  return `${amount}時`
+}
+
+interface TileProps {
+  readonly group: MuscleGroup
+  readonly done: boolean
+  /** 正在被拖曳中（原位要留下凹陷的空位） */
+  readonly ghost?: boolean
+  /** 浮在手上跟著手指跑的那一顆 */
+  readonly floating?: boolean
+  readonly onPointerDown?: (e: React.PointerEvent) => void
+  readonly onPointerMove?: (e: React.PointerEvent) => void
+  readonly onPointerUp?: () => void
+  readonly onClick?: () => void
+  readonly style?: CSSProperties
+}
+
+/**
+ * 一個正方形訓練方塊。
+ * 打勾態＝實心飽和色 + ✓ 角標；未打勾＝暗底 + 彩色邊框。
+ */
+export function Tile({
+  group,
+  done,
+  ghost,
+  floating,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onClick,
+  style,
+}: TileProps) {
+  const cls = [
+    'tile',
+    done ? 'is-done' : '',
+    ghost ? 'is-ghost' : '',
+    floating ? 'is-floating' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  return (
+    <div
+      className={cls}
+      style={
+        {
+          '--tone': `var(--${group.tone})`,
+          '--tone-soft': `var(--${group.tone}-soft)`,
+          ...style,
+        } as CSSProperties
+      }
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onClick={onClick}
+      role={floating ? 'presentation' : 'button'}
+      tabIndex={floating ? -1 : 0}
+      aria-label={`${group.name}${done ? '（已完成）' : ''}`}
+      title={floating ? undefined : done ? '點一下取消打勾' : '點一下打勾 · 按住可拖曳'}
+    >
+      <span className="tile-name">{group.name}</span>
+      {group.targetAmount > 0 && (
+        <span className="tile-goal">{unitLabel(group.targetAmount, group.unit)}</span>
+      )}
+      {done && (
+        <span className="tile-check" aria-hidden>
+          ✓
+        </span>
+      )}
+    </div>
+  )
+}

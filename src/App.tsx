@@ -1,31 +1,44 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import './App.css'
 import { useWorkout } from './lib/useWorkout'
 import { CATALOG, DAY_LABELS, groupById } from './domain/catalog'
 import { formatWeekRange, overallProgress, weekProgress } from './domain/week'
 import { checkKey, type DayIndex, type SlotKey } from './domain/types'
 import { USERS } from './lib/firebase'
+import { Tile } from './components/Tile'
+import { useDrag, type DropZone, type Held } from './lib/useDrag'
 
 const DAYS: readonly DayIndex[] = [0, 1, 2, 3, 4, 5, 6]
 const SLOTS: readonly SlotKey[] = ['morning', 'evening']
 
-function unitLabel(amount: number, unit: string): string {
-  if (amount <= 0) return ''
-  if (unit === 'sets') return `${amount}組`
-  if (unit === 'minutes') return `${amount}分`
-  return `${amount}時`
-}
+/** 底部拉盤：兩顆按鈕各自對應一個 */
+type Panel = 'progress' | 'template' | null
 
-/** 開啟中的選單：替換某項目 or 新增到某格 */
-type Sheet =
-  | { kind: 'swap'; day: DayIndex; slot: SlotKey; groupId: string }
-  | { kind: 'add'; day: DayIndex; slot: SlotKey }
-  | null
+/** 挑項目的小視窗：往某格加東西 */
+type Picker = { day: DayIndex; slot: SlotKey } | null
 
 export default function App() {
   const w = useWorkout()
-  const [sheet, setSheet] = useState<Sheet>(null)
-  const [editingTemplate, setEditingTemplate] = useState(false)
+  const [panel, setPanel] = useState<Panel>(null)
+  const [picker, setPicker] = useState<Picker>(null)
+
+  const { move, dropAway } = w
+
+  const onDropInto = useCallback(
+    (held: Held, zone: DropZone, displaceGroupId?: string): string | null =>
+      move(
+        { day: held.fromDay, slot: held.fromSlot, groupId: held.groupId },
+        { day: zone.day, slot: zone.slot, displaceGroupId },
+      ),
+    [move],
+  )
+
+  const onDropAway = useCallback(
+    (held: Held) => dropAway(held.groupId, held.fromDay, held.fromSlot),
+    [dropAway],
+  )
+
+  const drag = useDrag({ onDropInto, onDropAway })
 
   // 還沒選過使用者 → 選一次，之後開啟就直接進來
   if (!w.uid) {
@@ -55,385 +68,311 @@ export default function App() {
   }
 
   const plan = w.plan
-  const schedule = editingTemplate ? w.template : plan.schedule
   const overall = overallProgress(plan)
-  const progress = weekProgress(plan)
-  const activeMakeups = plan.makeups.filter((m) => !m.dismissed)
-  const pct = overall.total === 0 ? 0 : Math.round((overall.done / overall.total) * 100)
-
-  /** 模板模式下改的是模板，本週模式下改的是這一週 */
-  function mutate(
-    day: DayIndex,
-    slot: SlotKey,
-    next: (current: readonly string[]) => readonly string[],
-  ) {
-    if (!editingTemplate) return
-    const current = w.template[day][slot]
-    w.updateTemplate({
-      ...w.template,
-      [day]: { ...w.template[day], [slot]: next(current) },
-    })
-  }
-
-  function handleAdd(day: DayIndex, slot: SlotKey, groupId: string) {
-    if (editingTemplate) {
-      mutate(day, slot, (c) => (c.includes(groupId) ? c : [...c, groupId]))
-    } else {
-      w.add(day, slot, groupId)
-    }
-    setSheet(null)
-  }
-
-  function handleSwap(day: DayIndex, slot: SlotKey, from: string, to: string) {
-    if (editingTemplate) {
-      mutate(day, slot, (c) => (c.includes(to) ? c : c.map((g) => (g === from ? to : g))))
-    } else {
-      w.swap(day, slot, from, to)
-    }
-    setSheet(null)
-  }
-
-  function handleRemove(day: DayIndex, slot: SlotKey, groupId: string) {
-    if (editingTemplate) {
-      mutate(day, slot, (c) => c.filter((g) => g !== groupId))
-    } else {
-      w.remove(day, slot, groupId)
-    }
-    setSheet(null)
-  }
+  const percent = overall.total === 0 ? 0 : Math.round((overall.done / overall.total) * 100)
+  const held = drag.held
 
   return (
-    <div className="app">
+    <div className={`app${held ? ' is-dragging' : ''}`}>
       <header className="hd">
-        <div>
-          <h1 className="hd-title">每週健身</h1>
-          <p className="hd-sub">
-            {editingTemplate ? '編輯每週固定課表' : '點部位打勾 · ⋯ 可替換'}
-            {w.syncing && ' · 儲存中'}
-          </p>
-        </div>
-        <div className="hd-actions">
-          <button
-            className={`icon-btn${editingTemplate ? ' is-on' : ''}`}
-            onClick={() => setEditingTemplate((v) => !v)}
-            title={editingTemplate ? '回到本週' : '編輯模板'}
-            aria-label={editingTemplate ? '回到本週' : '編輯模板'}
-          >
-            {editingTemplate ? '✓' : '⚙'}
+        <h1 className="hd-title">每週健身</h1>
+        <div className="hd-right">
+          {/* 只有真的讀寫過雲端才敢說同步；沒連上就誠實說存在本機 */}
+          <span className="hd-sync" title={w.cloudReady ? '資料已同步雲端' : '資料存在這台裝置'}>
+            {w.cloudReady ? (w.syncing ? '同步中' : '已同步雲端') : '存在這台裝置'}
+          </span>
+          <button className="icon-btn" onClick={w.logout} title="換人">
+            {w.uid}
           </button>
         </div>
       </header>
 
-      {editingTemplate && (
-        <div className="tpl-banner">
-          <span>⚙</span>
-          <span>模板模式：改動會套用到往後每一週</span>
-          <button onClick={() => setEditingTemplate(false)}>完成</button>
+      <nav className="weeknav">
+        <button className="wk-arrow" onClick={w.goPrevWeek} aria-label="上一週">
+          ‹
+        </button>
+        <button className="wk-label" onClick={w.goThisWeek}>
+          <span className="wk-name">{w.isCurrentWeek ? '本週' : formatWeekRange(w.weekKey)}</span>
+          <span className="wk-range">{formatWeekRange(w.weekKey)}</span>
+        </button>
+        <button className="wk-arrow" onClick={w.goNextWeek} aria-label="下一週">
+          ›
+        </button>
+      </nav>
+
+      <div className="bar">
+        <div className="bar-track">
+          <div className="bar-fill" style={{ width: `${percent}%` }}>
+            <span className="bar-knob" />
+          </div>
         </div>
-      )}
-
-      {!editingTemplate && (
-        <>
-          <nav className="weeknav">
-            <button className="icon-btn" onClick={w.goPrevWeek} aria-label="上一週">
-              ‹
-            </button>
-            <div className="weeknav-label">
-              {w.isCurrentWeek ? '本週' : w.weekKey}
-              <span>{formatWeekRange(w.weekKey)}</span>
-            </div>
-            {!w.isCurrentWeek && (
-              <button className="today-btn" onClick={w.goThisWeek}>
-                回本週
-              </button>
-            )}
-            <button className="icon-btn" onClick={w.goNextWeek} aria-label="下一週">
-              ›
-            </button>
-          </nav>
-
-          <section className="overall">
-            <div className="overall-top">
-              <span className="overall-label">本週完成度</span>
-              <span className="overall-num">
-                {pct}% <em>· {overall.done}/{overall.total} 格</em>
-              </span>
-            </div>
-            <div className="track">
-              <div className="track-fill" style={{ width: `${pct}%` }} />
-            </div>
-          </section>
-        </>
-      )}
-
-      <div className="days">
-        {DAYS.map((day) => {
-          const isToday = !editingTemplate && w.isCurrentWeek && day === w.todayIndex
-          const dayItems = SLOTS.flatMap((s) => schedule[day][s])
-          const dayDone = SLOTS.flatMap((s) =>
-            schedule[day][s].filter((g) => plan.checked.includes(checkKey(day, s, g))),
-          )
-
-          return (
-            <article key={day} className={`day${isToday ? ' is-today' : ''}`}>
-              <div className="day-hd">
-                <span className="day-name">週{DAY_LABELS[day]}</span>
-                {isToday && <span className="day-today-tag">今天</span>}
-                {dayItems.length > 0 && !editingTemplate && (
-                  <span className="day-count">
-                    {dayDone.length}/{dayItems.length}
-                  </span>
-                )}
-              </div>
-
-              {SLOTS.map((slot) => {
-                const items = schedule[day][slot]
-                const allDone =
-                  items.length > 0 &&
-                  items.every((g) => plan.checked.includes(checkKey(day, slot, g)))
-
-                return (
-                  <div key={slot} className="slot">
-                    <span className="slot-icon" aria-hidden>
-                      {slot === 'morning' ? '☀' : '☾'}
-                    </span>
-
-                    <div className="slot-body">
-                      {items.length === 0 && (
-                        <span className="slot-empty">
-                          {slot === 'morning' ? '早上休息' : '晚上休息'}
-                        </span>
-                      )}
-
-                      {items.map((groupId) => {
-                        const g = groupById(groupId)
-                        if (!g) return null
-                        const done =
-                          !editingTemplate &&
-                          plan.checked.includes(checkKey(day, slot, groupId))
-
-                        return (
-                          <span
-                            key={groupId}
-                            className={`pill${done ? ' is-done' : ''}`}
-                            style={
-                              {
-                                '--tone': `var(--${g.tone})`,
-                                '--tone-soft': `var(--${g.tone}-soft)`,
-                              } as React.CSSProperties
-                            }
-                          >
-                            <button
-                              className="pill-name"
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
-                              onClick={() =>
-                                editingTemplate
-                                  ? setSheet({ kind: 'swap', day, slot, groupId })
-                                  : w.toggle(day, slot, groupId)
-                              }
-                              title={editingTemplate ? '點擊替換' : '點擊打勾'}
-                            >
-                              <span className="pill-dot" />
-                              {g.name}
-                              {g.targetAmount > 0 && (
-                                <span className="pill-goal">
-                                  {unitLabel(g.targetAmount, g.unit)}
-                                </span>
-                              )}
-                            </button>
-                            <button
-                              className="pill-x"
-                              onClick={() => setSheet({ kind: 'swap', day, slot, groupId })}
-                              aria-label={`更換或移除${g.name}`}
-                              title="更換／移除"
-                            >
-                              ⋯
-                            </button>
-                          </span>
-                        )
-                      })}
-
-                      <button
-                        className="pill-add"
-                        onClick={() => setSheet({ kind: 'add', day, slot })}
-                        aria-label={`在週${DAY_LABELS[day]}${slot === 'morning' ? '早上' : '晚上'}新增項目`}
-                        title="新增項目"
-                      >
-                        ＋
-                      </button>
-                    </div>
-
-                    {!editingTemplate && items.length > 0 && (
-                      <button
-                        className={`check${allDone ? ' is-on' : ''}`}
-                        onClick={() => w.toggleSlot(day, slot, !allDone)}
-                        aria-label={allDone ? '取消整段完成' : '整段標記完成'}
-                        title={allDone ? '取消整段完成' : '整段標記完成'}
-                      >
-                        ✓
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </article>
-          )
-        })}
+        <span className="bar-pct">{percent}%</span>
       </div>
 
-      {!editingTemplate && activeMakeups.length > 0 && (
-        <section className="makeup">
-          <div className="makeup-hd">
-            <span>⚠</span>
-            <span>本週補做（被換掉還沒做的）</span>
-          </div>
-          <div className="makeup-list">
-            {activeMakeups.map((m) => {
-              const g = groupById(m.groupId)
-              if (!g) return null
+      <div className="grid">
+        <div className="grid-head">
+          <span className="gh-spacer" />
+          <span className="gh-slot">早上</span>
+          <span className="gh-slot">晚上</span>
+        </div>
+
+        {DAYS.map((day) => (
+          <div
+            key={day}
+            className={`row${day === w.todayIndex && w.isCurrentWeek ? ' is-today' : ''}`}
+          >
+            <span className="row-day">{DAY_LABELS[day]}</span>
+            {SLOTS.map((slot) => {
+              const items = plan.schedule[day][slot]
+              const isHover =
+                drag.hoverZone?.day === day && drag.hoverZone?.slot === slot && Boolean(held)
               return (
-                <span key={`${m.groupId}-${m.fromDay}-${m.fromSlot}`} className="makeup-item">
-                  <span style={{ color: `var(--${g.tone})` }}>{g.name}</span>
-                  <span className="makeup-from">
-                    原週{DAY_LABELS[m.fromDay]}
-                    {m.fromSlot === 'morning' ? '早' : '晚'}
-                  </span>
-                  <button
-                    className="makeup-skip"
-                    onClick={() => w.dismiss(m.groupId)}
-                    aria-label={`本週跳過${g.name}`}
-                    title="本週跳過"
-                  >
-                    ×
-                  </button>
-                </span>
+                <div
+                  key={slot}
+                  className={`cell${isHover ? ' is-hover' : ''}`}
+                  data-day={day}
+                  data-slot={slot}
+                >
+                  {items.map((gid) => {
+                    const group = groupById(gid)
+                    if (!group) return null
+                    const done = plan.checked.includes(checkKey(day, slot, gid))
+                    // 同一個部位可能出現在好幾天，凹槽只能留在「被拿走的那一格」
+                    const ghost =
+                      held?.groupId === gid &&
+                      held.fromDay === day &&
+                      held.fromSlot === slot &&
+                      !held.displaced
+                    return (
+                      <div key={gid} className="cell-item" data-group={gid}>
+                        <Tile
+                          group={group}
+                          done={done}
+                          ghost={ghost}
+                          onPointerDown={(e) => drag.begin(e, gid, day, slot)}
+                          onPointerMove={drag.maybeCancel}
+                          onPointerUp={drag.endPending}
+                          onClick={() => {
+                            if (!held) w.toggle(day, slot, gid)
+                          }}
+                        />
+                      </div>
+                    )
+                  })}
+                  {items.length < 2 && (
+                    <button
+                      className="cell-add"
+                      onClick={() => setPicker({ day, slot })}
+                      aria-label="加入訓練"
+                    >
+                      ＋
+                    </button>
+                  )}
+                </div>
               )
             })}
           </div>
+        ))}
+      </div>
+
+      {plan.makeups.filter((m) => !m.dismissed).length > 0 && (
+        <section className="makeup">
+          <h2 className="mk-title">本週補做</h2>
+          <div className="mk-list">
+            {plan.makeups
+              .filter((m) => !m.dismissed)
+              .map((m) => {
+                const group = groupById(m.groupId)
+                if (!group) return null
+                return (
+                  <span key={`${m.groupId}-${m.fromDay}-${m.fromSlot}`} className="mk-chip">
+                    <i className="mk-dot" style={{ background: `var(--${group.tone})` }} />
+                    {group.name}
+                    <button
+                      className="mk-x"
+                      onClick={() => w.dismiss(m.groupId)}
+                      aria-label={`不補做 ${group.name}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                )
+              })}
+          </div>
         </section>
       )}
 
-      {!editingTemplate && (
-        <section className="prog">
-          <div className="prog-hd">部位進度（時段數 / 週目標）</div>
-          {progress.map((p) => {
-            const ratio = p.target === 0 ? 0 : Math.min(p.done / p.target, 1)
-            const short = p.planned < p.target
-            return (
-              <div key={p.groupId} className="prog-row">
-                <div className="prog-name">
-                  <span
-                    className="pill-dot"
-                    style={{ background: `var(--${p.tone})` }}
-                    aria-hidden
-                  />
-                  <span>{p.name}</span>
-                </div>
-                <div className="prog-track">
-                  <div
-                    className="prog-fill"
-                    style={
-                      {
-                        width: `${ratio * 100}%`,
-                        '--tone': `var(--${p.tone})`,
-                      } as React.CSSProperties
-                    }
-                  />
-                </div>
-                <div className={`prog-num${short ? ' is-short' : ''}`}>
-                  {p.done}/{p.target}
-                  {short && <span className="prog-goal">·排{p.planned}</span>}
-                </div>
-              </div>
-            )
-          })}
-        </section>
-      )}
-
-      <footer className="ft">
-        <span>{w.cloudReady ? '資料已同步雲端' : '資料存在這台裝置'}</span>
-        <span className="ft-sep">·</span>
-        <span>{w.uid}</span>
-        <button className="link-btn" onClick={w.logout}>
-          登出
+      <footer className="tabs">
+        <button className="tab" onClick={() => setPanel('progress')}>
+          <span className="tab-ico" aria-hidden>
+            ▊▍▎
+          </span>
+          部位進度
+        </button>
+        <button className="tab" onClick={() => setPanel('template')}>
+          <span className="tab-ico" aria-hidden>
+            ⠿
+          </span>
+          每週模板
         </button>
       </footer>
 
-      {sheet && (
-        <div className="sheet-back" onClick={() => setSheet(null)} role="presentation">
-          <div className="sheet" onClick={(e) => e.stopPropagation()}>
-            <div className="sheet-grip" />
+      {/* 拿在手上、跟著手指跑的那一顆 */}
+      {held &&
+        (() => {
+          const group = groupById(held.groupId)
+          if (!group) return null
+          return (
+            <Tile
+              group={group}
+              done={false}
+              floating
+              style={{
+                left: held.x - held.dx,
+                top: held.y - held.dy,
+              }}
+            />
+          )
+        })()}
 
-            {sheet.kind === 'add' ? (
-              <>
-                <h2 className="sheet-title">
-                  新增到 週{DAY_LABELS[sheet.day]}
-                  {sheet.slot === 'morning' ? '早上' : '晚上'}
-                </h2>
-                <p className="sheet-sub">
-                  {editingTemplate ? '會套用到往後每一週' : '只影響這一週'}
-                </p>
-              </>
-            ) : (
-              <>
-                <h2 className="sheet-title">更換「{groupById(sheet.groupId)?.name}」</h2>
-                <p className="sheet-sub">
-                  {editingTemplate
-                    ? '會套用到往後每一週'
-                    : '只影響這一週，換掉的會進補做池'}
-                </p>
-              </>
-            )}
-
-            <div className="sheet-grid">
-              {CATALOG.map((g) => {
-                const already = schedule[sheet.day][sheet.slot].includes(g.id)
-                const isSelf = sheet.kind === 'swap' && g.id === sheet.groupId
-                return (
-                  <button
-                    key={g.id}
-                    className="sheet-opt"
-                    disabled={already && !isSelf}
-                    style={
-                      {
-                        '--tone': `var(--${g.tone})`,
-                        '--tone-soft': `var(--${g.tone}-soft)`,
-                      } as React.CSSProperties
-                    }
-                    onClick={() =>
-                      sheet.kind === 'add'
-                        ? handleAdd(sheet.day, sheet.slot, g.id)
-                        : handleSwap(sheet.day, sheet.slot, sheet.groupId, g.id)
-                    }
-                  >
-                    <span className="pill-dot" />
-                    <span>
-                      {g.name}
-                      <small>
-                        {unitLabel(g.targetAmount, g.unit)}
-                        {g.targetAmount > 0 ? ' · ' : ''}
-                        {g.targetSessions}時段
-                      </small>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-
-            {sheet.kind === 'swap' && (
-              <>
-                <div className="sheet-sep" />
-                <button
-                  className="sheet-danger"
-                  onClick={() => handleRemove(sheet.day, sheet.slot, sheet.groupId)}
-                >
-                  從這一格移除
-                </button>
-              </>
-            )}
-          </div>
+      {held && (
+        <div className="hand-hint">
+          {held.displaced ? `${groupById(held.groupId)?.name} 在你手上` : '放到空白處 → 進補做'}
         </div>
       )}
+
+      {picker && (
+        <PickerSheet
+          onClose={() => setPicker(null)}
+          onPick={(gid) => {
+            w.add(picker.day, picker.slot, gid)
+            setPicker(null)
+          }}
+        />
+      )}
+
+      {panel === 'progress' && (
+        <ProgressSheet rows={weekProgress(plan)} onClose={() => setPanel(null)} />
+      )}
+
+      {panel === 'template' && (
+        <TemplateSheet
+          onClose={() => setPanel(null)}
+          onSaveCurrent={() => {
+            w.saveCurrentAsTemplate()
+            setPanel(null)
+          }}
+          onReset={() => {
+            w.resetWeekToTemplate()
+            setPanel(null)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/** 底部拉盤外殼：點背景或往下拉都可以關 */
+function Sheet({
+  title,
+  onClose,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <>
+      <div className="sheet-back" onClick={onClose} />
+      <div className="sheet" role="dialog" aria-label={title}>
+        <button className="sheet-grip" onClick={onClose} aria-label="關閉" />
+        <h2 className="sheet-title">{title}</h2>
+        <div className="sheet-body">{children}</div>
+      </div>
+    </>
+  )
+}
+
+function ProgressSheet({
+  rows,
+  onClose,
+}: {
+  rows: ReturnType<typeof weekProgress>
+  onClose: () => void
+}) {
+  return (
+    <Sheet title="部位進度" onClose={onClose}>
+      <div className="prog">
+        {rows.map((r) => (
+          <div key={r.groupId} className="prog-row">
+            <span className="prog-name">{r.name}</span>
+            <div className="prog-track">
+              <div
+                className="prog-fill"
+                style={{
+                  width: r.target > 0 ? `${Math.min(100, (r.done / r.target) * 100)}%` : '0%',
+                  background: `var(--${r.tone})`,
+                }}
+              />
+            </div>
+            <span className="prog-num">
+              {r.done}/{r.target}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Sheet>
+  )
+}
+
+function TemplateSheet({
+  onClose,
+  onSaveCurrent,
+  onReset,
+}: {
+  onClose: () => void
+  onSaveCurrent: () => void
+  onReset: () => void
+}) {
+  return (
+    <Sheet title="每週模板" onClose={onClose}>
+      <p className="sheet-note">
+        模板是每一週的起點。單週拖來拖去不會動到模板；要永久改變就把目前這週存成模板。
+      </p>
+      <div className="sheet-actions">
+        <button className="sheet-btn is-primary" onClick={onSaveCurrent}>
+          把這週存成模板
+        </button>
+        <button className="sheet-btn" onClick={onReset}>
+          用模板重設這週
+        </button>
+      </div>
+    </Sheet>
+  )
+}
+
+function PickerSheet({
+  onClose,
+  onPick,
+}: {
+  onClose: () => void
+  onPick: (groupId: string) => void
+}) {
+  return (
+    <Sheet title="加入訓練" onClose={onClose}>
+      <div className="pick-grid">
+        {CATALOG.map((g) => (
+          <button
+            key={g.id}
+            className="pick-tile"
+            style={{ '--tone': `var(--${g.tone})` } as React.CSSProperties}
+            onClick={() => onPick(g.id)}
+          >
+            {g.name}
+          </button>
+        ))}
+      </div>
+    </Sheet>
   )
 }

@@ -3,12 +3,16 @@ import type { DayIndex, Schedule, SlotKey, WeekPlan } from '../domain/types'
 import {
   addToSlot,
   dismissMakeup,
+  dropToMakeup,
+  moveGroup,
   removeFromSlot,
   setSlotChecked,
   shiftWeekKey,
   swapGroup,
   toggleCheck,
   weekKeyOf,
+  type DragSource,
+  type DropTarget,
 } from '../domain/week'
 import { defaultSchedule } from '../domain/catalog'
 import {
@@ -149,6 +153,28 @@ export function useWorkout() {
     dismiss: useCallback(
       (groupId: string) => {
         if (plan) persist(dismissMakeup(plan, groupId))
+      },
+      [plan, persist],
+    ),
+
+    /**
+     * 拖放：把一項搬到別格。回傳被頂出來的項目（黏在手上），沒有就是 null。
+     * 呼叫端要拿這個回傳值決定手上還有沒有東西。
+     */
+    move: useCallback(
+      (from: DragSource, to: DropTarget): string | null => {
+        if (!plan) return null
+        const r = moveGroup(plan, from, to)
+        if (r.plan !== plan) persist(r.plan)
+        return r.displaced
+      },
+      [plan, persist],
+    ),
+
+    /** 手上的項目放到空白處 → 進補做池 */
+    dropAway: useCallback(
+      (groupId: string, fromDay: DayIndex, fromSlot: SlotKey) => {
+        if (plan) persist(dropToMakeup(plan, groupId, fromDay, fromSlot))
       },
       [plan, persist],
     ),

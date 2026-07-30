@@ -206,6 +206,109 @@ export function removeFromSlot(
   }
 }
 
+/** 拖曳的來源：某格裡的某一項 */
+export interface DragSource {
+  readonly day: DayIndex
+  readonly slot: SlotKey
+  readonly groupId: string
+}
+
+/**
+ * 拖曳的落點。指定 displaceGroupId = 要頂掉目標格裡的哪一項；
+ * 不指定就是單純放進去（目標格還有空位時）。
+ */
+export interface DropTarget {
+  readonly day: DayIndex
+  readonly slot: SlotKey
+  readonly displaceGroupId?: string
+}
+
+export interface MoveResult {
+  readonly plan: WeekPlan
+  /**
+   * 被頂出來的項目 —— 它現在「在手上」，還沒進補做池。
+   * 使用者可以再把它放到別格，或放到空白處（走 dropToMakeup）。
+   */
+  readonly displaced: string | null
+}
+
+/**
+ * 把一項從某格拖到另一格。
+ *
+ * 這是拖放的核心：跟 swapGroup（同一格內換成別的項目）不同，
+ * 這裡是**跨格搬移**，而且被頂出來的那項不直接進補做池——
+ * 它回傳給呼叫端黏在手上，等使用者決定放哪。
+ */
+export function moveGroup(plan: WeekPlan, from: DragSource, to: DropTarget): MoveResult {
+  const none = { plan, displaced: null }
+
+  const source = plan.schedule[from.day][from.slot]
+  if (!source.includes(from.groupId)) return none
+
+  // 原地放下 = 沒事發生
+  if (from.day === to.day && from.slot === to.slot) return none
+
+  const targetItems = plan.schedule[to.day][to.slot]
+  // 目標格已經有同一項 → 不做事，避免同一格出現兩個一樣的
+  if (targetItems.includes(from.groupId)) return none
+
+  const displaced =
+    to.displaceGroupId && targetItems.includes(to.displaceGroupId) ? to.displaceGroupId : null
+
+  const wasChecked = plan.checked.includes(checkKey(from.day, from.slot, from.groupId))
+
+  const nextSource = source.filter((g) => g !== from.groupId)
+  const nextTarget = displaced
+    ? targetItems.map((g) => (g === displaced ? from.groupId : g))
+    : [...targetItems, from.groupId]
+
+  let schedule = replaceSlot(plan.schedule, from.day, from.slot, nextSource)
+  schedule = replaceSlot(schedule, to.day, to.slot, nextTarget)
+
+  // 勾跟著項目搬家：做過就是做過，換位置不該讓它變沒做。
+  // 被頂出來那項的勾要清掉——它已經不在課表上了。
+  const checked = plan.checked
+    .filter((k) => k !== checkKey(from.day, from.slot, from.groupId))
+    .filter((k) => (displaced ? k !== checkKey(to.day, to.slot, displaced) : true))
+
+  return {
+    plan: {
+      ...plan,
+      schedule,
+      checked: wasChecked ? [...checked, checkKey(to.day, to.slot, from.groupId)] : checked,
+      // 搬進來的項目若原本欠著，視為補回
+      makeups: plan.makeups.filter((m) => m.groupId !== from.groupId),
+      updatedAt: Date.now(),
+    },
+    displaced,
+  }
+}
+
+/**
+ * 手上拿著的項目放到空白處 → 進補做池。
+ * 已打勾的不算欠（做過了），沿用 removeFromSlot 的規則。
+ */
+export function dropToMakeup(
+  plan: WeekPlan,
+  groupId: string,
+  fromDay: DayIndex,
+  fromSlot: SlotKey,
+): WeekPlan {
+  const wasChecked = plan.checked.includes(checkKey(fromDay, fromSlot, groupId))
+  if (wasChecked) return plan
+
+  return {
+    ...plan,
+    makeups: [
+      ...plan.makeups.filter(
+        (m) => !(m.groupId === groupId && m.fromDay === fromDay && m.fromSlot === fromSlot),
+      ),
+      { groupId, fromDay, fromSlot, dismissed: false },
+    ],
+    updatedAt: Date.now(),
+  }
+}
+
 /** 標記某補做項目本週跳過 */
 export function dismissMakeup(plan: WeekPlan, groupId: string): WeekPlan {
   return {
