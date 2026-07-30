@@ -76,23 +76,23 @@ describe('weekKeyOf — ISO 週次', () => {
 describe('toggleCheck — 打勾', () => {
   it('打勾後再點一次會取消', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const once = toggleCheck(plan, 0, 'morning', 'chest')
-    expect(once.checked).toContain(checkKey(0, 'morning', 'chest'))
+    const once = toggleCheck(plan, 0, 'evening', 'chest')
+    expect(once.checked).toContain(checkKey(0, 'evening', 'chest'))
 
-    const twice = toggleCheck(once, 0, 'morning', 'chest')
-    expect(twice.checked).not.toContain(checkKey(0, 'morning', 'chest'))
+    const twice = toggleCheck(once, 0, 'evening', 'chest')
+    expect(twice.checked).not.toContain(checkKey(0, 'evening', 'chest'))
   })
 
   it('不同時段的同一部位各自獨立', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const p = toggleCheck(plan, 0, 'morning', 'chest')
-    expect(p.checked).toContain(checkKey(0, 'morning', 'chest'))
-    expect(p.checked).not.toContain(checkKey(4, 'morning', 'chest'))
+    const p = toggleCheck(plan, 0, 'evening', 'chest')
+    expect(p.checked).toContain(checkKey(0, 'evening', 'chest'))
+    expect(p.checked).not.toContain(checkKey(4, 'evening', 'chest'))
   })
 
   it('不可變：原本的 plan 不被修改', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    toggleCheck(plan, 0, 'morning', 'chest')
+    toggleCheck(plan, 0, 'evening', 'chest')
     expect(plan.checked).toHaveLength(0)
   })
 })
@@ -100,34 +100,34 @@ describe('toggleCheck — 打勾', () => {
 describe('swapGroup — 單日替換與補做池', () => {
   it('未打勾的項目被換掉 → 進補做池', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const next = swapGroup(plan, 1, 'morning', 'back', 'legs')
+    const next = swapGroup(plan, 1, 'evening', 'back', 'legs')
 
-    expect(next.schedule[1].morning).toContain('legs')
-    expect(next.schedule[1].morning).not.toContain('back')
+    expect(next.schedule[1].evening).toContain('legs')
+    expect(next.schedule[1].evening).not.toContain('back')
     expect(next.makeups.map((m) => m.groupId)).toContain('back')
   })
 
   it('已打勾的項目被換掉 → 不進補做池（已經做過了）', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const checked = toggleCheck(plan, 1, 'morning', 'back')
-    const next = swapGroup(checked, 1, 'morning', 'back', 'legs')
+    const checked = toggleCheck(plan, 1, 'evening', 'back')
+    const next = swapGroup(checked, 1, 'evening', 'back', 'legs')
 
     expect(next.makeups.map((m) => m.groupId)).not.toContain('back')
   })
 
   it('替換後舊項目的勾要清掉，新項目從未打勾開始', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const checked = toggleCheck(plan, 1, 'morning', 'back')
-    const next = swapGroup(checked, 1, 'morning', 'back', 'legs')
+    const checked = toggleCheck(plan, 1, 'evening', 'back')
+    const next = swapGroup(checked, 1, 'evening', 'back', 'legs')
 
-    expect(next.checked).not.toContain(checkKey(1, 'morning', 'back'))
-    expect(next.checked).not.toContain(checkKey(1, 'morning', 'legs'))
+    expect(next.checked).not.toContain(checkKey(1, 'evening', 'back'))
+    expect(next.checked).not.toContain(checkKey(1, 'evening', 'legs'))
   })
 
   it('換成已存在同格的項目 → 不動作（避免重複）', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    // 週一早上已有 chest 與 shoulders
-    const next = swapGroup(plan, 0, 'morning', 'chest', 'shoulders')
+    // 週一晚上已有 chest 與 shoulders
+    const next = swapGroup(plan, 0, 'evening', 'chest', 'shoulders')
     expect(next).toBe(plan)
   })
 
@@ -139,33 +139,34 @@ describe('swapGroup — 單日替換與補做池', () => {
 
   it('同一格重複替換不會產生重複的補做項目', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const a = swapGroup(plan, 1, 'morning', 'back', 'legs')
-    const b = swapGroup(a, 1, 'morning', 'legs', 'squash')
+    const a = swapGroup(plan, 1, 'evening', 'back', 'legs')
+    const b = swapGroup(a, 1, 'evening', 'legs', 'squash')
     const backEntries = b.makeups.filter((m) => m.groupId === 'back')
     expect(backEntries).toHaveLength(1)
   })
 })
 
 describe('addToSlot / removeFromSlot', () => {
-  it('新增項目到空的晚上時段', () => {
+  it('新增項目到空的時段（週日整天沒排）', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const next = addToSlot(plan, 0, 'evening', 'legs')
-    expect(next.schedule[0].evening).toEqual(['legs'])
+    const next = addToSlot(plan, 6, 'evening', 'legs')
+    expect(next.schedule[6].evening).toEqual(['legs'])
   })
 
   it('重複新增同一項目不會產生兩份', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const once = addToSlot(plan, 0, 'evening', 'legs')
-    const twice = addToSlot(once, 0, 'evening', 'legs')
-    expect(twice.schedule[0].evening).toEqual(['legs'])
+    const once = addToSlot(plan, 6, 'evening', 'legs')
+    const twice = addToSlot(once, 6, 'evening', 'legs')
+    expect(twice.schedule[6].evening).toEqual(['legs'])
   })
 
   it('把補做池的項目排回課表 → 該補做項目消失', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const removed = removeFromSlot(plan, 1, 'morning', 'back')
+    const removed = removeFromSlot(plan, 1, 'evening', 'back')
     expect(removed.makeups.map((m) => m.groupId)).toContain('back')
 
-    const restored = addToSlot(removed, 5, 'evening', 'back')
+    // 排到週日（沒排東西的那天），確認補做項目被銷掉
+    const restored = addToSlot(removed, 6, 'evening', 'back')
     expect(restored.makeups.map((m) => m.groupId)).not.toContain('back')
   })
 
@@ -185,7 +186,7 @@ describe('addToSlot / removeFromSlot', () => {
 describe('dismissMakeup — 本週跳過', () => {
   it('標記跳過後 dismissed 為 true', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const removed = removeFromSlot(plan, 1, 'morning', 'back')
+    const removed = removeFromSlot(plan, 1, 'evening', 'back')
     const dismissed = dismissMakeup(removed, 'back')
     expect(dismissed.makeups.find((m) => m.groupId === 'back')?.dismissed).toBe(true)
   })
@@ -202,7 +203,7 @@ describe('weekProgress — 部位進度', () => {
 
   it('打勾後 done 增加', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const checked = toggleCheck(plan, 0, 'morning', 'chest')
+    const checked = toggleCheck(plan, 0, 'evening', 'chest')
     const chest = weekProgress(checked).find((p) => p.groupId === 'chest')!
     expect(chest.done).toBe(1)
   })
@@ -256,33 +257,31 @@ describe('overallProgress — 整體完成率', () => {
 })
 
 describe('setSlotChecked — 整段一次打勾', () => {
-  it('一次呼叫就把整段三個項目全部打勾', () => {
+  it('一次呼叫就把整段的項目全部打勾', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    // 週一早上 = 二三頭 / 胸 / 肩
-    const next = setSlotChecked(plan, 0, 'morning', true)
-    expect(next.checked).toContain(checkKey(0, 'morning', 'arms'))
-    expect(next.checked).toContain(checkKey(0, 'morning', 'chest'))
-    expect(next.checked).toContain(checkKey(0, 'morning', 'shoulders'))
-    expect(next.checked).toHaveLength(3)
+    // 週一晚上 = 胸 / 肩
+    const next = setSlotChecked(plan, 0, 'evening', true)
+    expect(next.checked).toContain(checkKey(0, 'evening', 'chest'))
+    expect(next.checked).toContain(checkKey(0, 'evening', 'shoulders'))
+    expect(next.checked).toHaveLength(2)
   })
 
   it('取消整段只清掉該段的 key，不動其他段', () => {
     let plan = createWeekPlan('2026-W31', defaultSchedule())
-    plan = setSlotChecked(plan, 0, 'morning', true)
+    plan = setSlotChecked(plan, 0, 'evening', true)
     plan = setSlotChecked(plan, 1, 'morning', true)
-    const next = setSlotChecked(plan, 0, 'morning', false)
+    const next = setSlotChecked(plan, 0, 'evening', false)
 
-    expect(next.checked).not.toContain(checkKey(0, 'morning', 'chest'))
+    expect(next.checked).not.toContain(checkKey(0, 'evening', 'chest'))
     expect(next.checked).toContain(checkKey(1, 'morning', 'hiit'))
-    expect(next.checked).toContain(checkKey(1, 'morning', 'back'))
   })
 
   it('部分已打勾時，設 true 會補齊剩下的（不會重複）', () => {
     let plan = createWeekPlan('2026-W31', defaultSchedule())
-    plan = toggleCheck(plan, 0, 'morning', 'chest')
-    const next = setSlotChecked(plan, 0, 'morning', true)
-    expect(next.checked).toHaveLength(3)
-    expect(new Set(next.checked).size).toBe(3)
+    plan = toggleCheck(plan, 0, 'evening', 'chest')
+    const next = setSlotChecked(plan, 0, 'evening', true)
+    expect(next.checked).toHaveLength(2)
+    expect(new Set(next.checked).size).toBe(2)
   })
 
   it('已是目標狀態就原樣返回', () => {
@@ -294,7 +293,8 @@ describe('setSlotChecked — 整段一次打勾', () => {
 
   it('空時段不做事', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    expect(setSlotChecked(plan, 0, 'evening', true)).toBe(plan)
+    // 週日整天沒排東西
+    expect(setSlotChecked(plan, 6, 'morning', true)).toBe(plan)
   })
 
   it('不動到原本的 plan（immutability）', () => {
@@ -305,112 +305,112 @@ describe('setSlotChecked — 整段一次打勾', () => {
 })
 
 describe('moveGroup — 拖放：拿起來放到別格', () => {
-  // 預設：週一早 = arms, chest, shoulders；週一晚 = 空；週二早 = hiit, back
+  // 預設：週一早 = arms；週一晚 = chest, shoulders；週二早 = hiit；週日 = 整天空
 
   it('拖到空格 → 單純搬過去，手上不留東西', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'chest' }, { day: 0, slot: 'evening' })
+    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'arms' }, { day: 6, slot: 'morning' })
 
-    expect(r.plan.schedule[0].morning).not.toContain('chest')
-    expect(r.plan.schedule[0].evening).toContain('chest')
+    expect(r.plan.schedule[0].morning).not.toContain('arms')
+    expect(r.plan.schedule[6].morning).toContain('arms')
     expect(r.displaced).toBeNull()
   })
 
   it('拖到空格不算欠 → 不進補做池（只是換位置，不是不做）', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'chest' }, { day: 0, slot: 'evening' })
-    expect(r.plan.makeups.map((m) => m.groupId)).not.toContain('chest')
+    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'arms' }, { day: 6, slot: 'morning' })
+    expect(r.plan.makeups.map((m) => m.groupId)).not.toContain('arms')
   })
 
   it('拖到已滿的目標格 → 交換，被頂出的項目回傳到手上', () => {
-    // 週一早的 chest 拖到週二早，指定頂掉 back
+    // 週一早的 arms 拖到週二早，指定頂掉 hiit
     const plan = createWeekPlan('2026-W31', defaultSchedule())
     const r = moveGroup(
       plan,
-      { day: 0, slot: 'morning', groupId: 'chest' },
-      { day: 1, slot: 'morning', displaceGroupId: 'back' },
+      { day: 0, slot: 'morning', groupId: 'arms' },
+      { day: 1, slot: 'morning', displaceGroupId: 'hiit' },
     )
 
-    expect(r.plan.schedule[1].morning).toContain('chest')
-    expect(r.plan.schedule[1].morning).not.toContain('back')
-    expect(r.plan.schedule[0].morning).not.toContain('chest')
-    expect(r.displaced).toBe('back')
+    expect(r.plan.schedule[1].morning).toContain('arms')
+    expect(r.plan.schedule[1].morning).not.toContain('hiit')
+    expect(r.plan.schedule[0].morning).not.toContain('arms')
+    expect(r.displaced).toBe('hiit')
   })
 
   it('被頂出來的項目還沒進補做池 —— 它在手上，等使用者決定放哪', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
     const r = moveGroup(
       plan,
-      { day: 0, slot: 'morning', groupId: 'chest' },
-      { day: 1, slot: 'morning', displaceGroupId: 'back' },
+      { day: 0, slot: 'morning', groupId: 'arms' },
+      { day: 1, slot: 'morning', displaceGroupId: 'hiit' },
     )
-    expect(r.plan.makeups.map((m) => m.groupId)).not.toContain('back')
+    expect(r.plan.makeups.map((m) => m.groupId)).not.toContain('hiit')
   })
 
   it('拖曳的項目已打勾 → 勾跟著搬到新位置（做過就是做過）', () => {
     let plan = createWeekPlan('2026-W31', defaultSchedule())
-    plan = toggleCheck(plan, 0, 'morning', 'chest')
-    expect(plan.checked).toContain(checkKey(0, 'morning', 'chest'))
+    plan = toggleCheck(plan, 0, 'morning', 'arms')
+    expect(plan.checked).toContain(checkKey(0, 'morning', 'arms'))
 
-    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'chest' }, { day: 0, slot: 'evening' })
+    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'arms' }, { day: 6, slot: 'morning' })
 
-    expect(r.plan.checked).not.toContain(checkKey(0, 'morning', 'chest'))
-    expect(r.plan.checked).toContain(checkKey(0, 'evening', 'chest'))
+    expect(r.plan.checked).not.toContain(checkKey(0, 'morning', 'arms'))
+    expect(r.plan.checked).toContain(checkKey(6, 'morning', 'arms'))
   })
 
   it('目標格已經有同一項 → 不動作（不會出現兩個一樣的）', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    // 週五早也有 chest，把週一早的 chest 拖過去應該不動
-    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'chest' }, { day: 4, slot: 'morning' })
+    // 週四早也是 arms，把週一早的 arms 拖過去應該不動
+    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'arms' }, { day: 3, slot: 'morning' })
     expect(r.plan).toBe(plan)
     expect(r.displaced).toBeNull()
   })
 
   it('原地拖放（同一格）→ 不動作', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'chest' }, { day: 0, slot: 'morning' })
+    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'arms' }, { day: 0, slot: 'morning' })
     expect(r.plan).toBe(plan)
     expect(r.displaced).toBeNull()
   })
 
   it('來源格根本沒這一項 → 不動作', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const r = moveGroup(plan, { day: 0, slot: 'evening', groupId: 'chest' }, { day: 1, slot: 'evening' })
+    const r = moveGroup(plan, { day: 0, slot: 'morning', groupId: 'chest' }, { day: 6, slot: 'evening' })
     expect(r.plan).toBe(plan)
   })
 
   it('不動到原本的 plan（immutability）', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
     const before = [...plan.schedule[0].morning]
-    moveGroup(plan, { day: 0, slot: 'morning', groupId: 'chest' }, { day: 0, slot: 'evening' })
+    moveGroup(plan, { day: 0, slot: 'morning', groupId: 'arms' }, { day: 6, slot: 'morning' })
     expect(plan.schedule[0].morning).toEqual(before)
-    expect(plan.schedule[0].evening).toHaveLength(0)
+    expect(plan.schedule[6].morning).toHaveLength(0)
   })
 })
 
 describe('dropToMakeup — 手上的項目放到空白處 → 進補做', () => {
   it('沒打勾的項目 → 進補做池，記住原本在哪', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const next = dropToMakeup(plan, 'back', 1, 'morning')
+    const next = dropToMakeup(plan, 'back', 1, 'evening')
 
     const m = next.makeups.find((x) => x.groupId === 'back')
     expect(m).toBeDefined()
     expect(m?.fromDay).toBe(1)
-    expect(m?.fromSlot).toBe('morning')
+    expect(m?.fromSlot).toBe('evening')
     expect(m?.dismissed).toBe(false)
   })
 
   it('已打勾的項目 → 不進補做池（已經做過了，不算欠）', () => {
     let plan = createWeekPlan('2026-W31', defaultSchedule())
-    plan = toggleCheck(plan, 1, 'morning', 'back')
-    const next = dropToMakeup(plan, 'back', 1, 'morning')
+    plan = toggleCheck(plan, 1, 'evening', 'back')
+    const next = dropToMakeup(plan, 'back', 1, 'evening')
     expect(next.makeups.map((m) => m.groupId)).not.toContain('back')
   })
 
   it('同一項不會在補做池重複兩筆', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const once = dropToMakeup(plan, 'back', 1, 'morning')
-    const twice = dropToMakeup(once, 'back', 1, 'morning')
+    const once = dropToMakeup(plan, 'back', 1, 'evening')
+    const twice = dropToMakeup(once, 'back', 1, 'evening')
     expect(twice.makeups.filter((m) => m.groupId === 'back')).toHaveLength(1)
   })
 })

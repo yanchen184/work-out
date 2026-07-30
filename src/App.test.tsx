@@ -90,13 +90,13 @@ describe('App — 拖放', () => {
   it('拖到空格＝單純搬過去，原本那格就沒了', async () => {
     await renderApp()
 
-    // 週一晚上是空的
-    expect(within(cell(0, 'evening')).queryByText('胸')).toBeNull()
+    // 週日整天沒排東西
+    expect(within(cell(6, 'morning')).queryByText('二三頭')).toBeNull()
 
-    await dragTo({ day: 0, slot: 'morning', name: '胸' }, { day: 0, slot: 'evening' })
+    await dragTo({ day: 0, slot: 'morning', name: '二三頭' }, { day: 6, slot: 'morning' })
 
-    expect(within(cell(0, 'evening')).getByText('胸')).toBeTruthy()
-    expect(within(cell(0, 'morning')).queryByText('胸')).toBeNull()
+    expect(within(cell(6, 'morning')).getByText('二三頭')).toBeTruthy()
+    expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
     // 單純搬移不算欠，不進補做
     expect(document.querySelector('.makeup')).toBeNull()
   })
@@ -105,12 +105,12 @@ describe('App — 拖放', () => {
     const user = userEvent.setup()
     await renderApp()
 
-    await user.click(tile(0, 'morning', '胸'))
-    expect(tile(0, 'morning', '胸')).toHaveClass('is-done')
+    await user.click(tile(0, 'morning', '二三頭'))
+    expect(tile(0, 'morning', '二三頭')).toHaveClass('is-done')
 
-    await dragTo({ day: 0, slot: 'morning', name: '胸' }, { day: 0, slot: 'evening' })
+    await dragTo({ day: 0, slot: 'morning', name: '二三頭' }, { day: 6, slot: 'morning' })
 
-    expect(tile(0, 'evening', '胸')).toHaveClass('is-done')
+    expect(tile(6, 'morning', '二三頭')).toHaveClass('is-done')
   })
 
   it('同一個部位出現在多天時，凹槽只留在被拿走的那一格', async () => {
@@ -138,14 +138,14 @@ describe('App — 拖放', () => {
   it('拖到有東西的格子＝交換，被頂出來的黏在手上', async () => {
     await renderApp()
 
-    // 週二早上有 間歇 / 背，放到「背」上面 → 頂掉背
+    // 週二早上有 間歇，放到「間歇」上面 → 頂掉間歇
     await dragTo(
-      { day: 0, slot: 'morning', name: '胸' },
-      { day: 1, slot: 'morning', onto: '背' },
+      { day: 0, slot: 'morning', name: '二三頭' },
+      { day: 1, slot: 'morning', onto: '間歇' },
     )
 
-    // 胸 進到週二早上
-    expect(within(cell(1, 'morning')).getByText('胸')).toBeTruthy()
+    // 二三頭 進到週二早上
+    expect(within(cell(1, 'morning')).getByText('二三頭')).toBeTruthy()
     // 被頂出來的那顆顯示在手上，還沒落地就不該進補做池
     expect(screen.getByText(/在你手上/)).toBeTruthy()
     expect(document.querySelector('.makeup')).toBeNull()
@@ -156,7 +156,7 @@ describe('App — 補做池', () => {
   it('手上的方塊放到空白處 → 進補做', async () => {
     await renderApp()
 
-    const source = tile(0, 'morning', '胸')
+    const source = tile(0, 'morning', '二三頭')
     // elementFromPoint 回 null＝手指下面不是任何格子＝空白處
     const original = document.elementFromPoint
     document.elementFromPoint = () => null
@@ -172,16 +172,16 @@ describe('App — 補做池', () => {
 
     const makeup = document.querySelector('.makeup') as HTMLElement
     expect(makeup).toBeTruthy()
-    expect(within(makeup).getByText('胸')).toBeTruthy()
+    expect(within(makeup).getByText('二三頭')).toBeTruthy()
   })
 
   it('已打勾的丟到空白處不算欠，不進補做', async () => {
     const user = userEvent.setup()
     await renderApp()
 
-    await user.click(tile(0, 'morning', '胸'))
+    await user.click(tile(0, 'morning', '二三頭'))
 
-    const source = tile(0, 'morning', '胸')
+    const source = tile(0, 'morning', '二三頭')
     const original = document.elementFromPoint
     document.elementFromPoint = () => null
 
@@ -199,17 +199,17 @@ describe('App — 補做池', () => {
 })
 
 describe('App — 新增項目', () => {
-  it('可以新增項目到空的晚上時段', async () => {
+  it('可以新增項目到空的時段', async () => {
     const user = userEvent.setup()
     await renderApp()
 
-    await user.click(within(cell(0, 'evening')).getByLabelText('加入訓練'))
+    await user.click(within(cell(6, 'evening')).getByLabelText('加入訓練'))
     await screen.findByText('加入訓練')
 
     const sheet = document.querySelector('.sheet') as HTMLElement
     await user.click(within(sheet).getByText('腳踏車'))
 
-    expect(within(cell(0, 'evening')).getByText('腳踏車')).toBeTruthy()
+    expect(within(cell(6, 'evening')).getByText('腳踏車')).toBeTruthy()
   })
 })
 
@@ -232,8 +232,8 @@ describe('App — 底部拉盤', () => {
     const user = userEvent.setup()
     await renderApp()
 
-    // 先把週一早上的胸搬到晚上，讓這週跟預設模板不一樣
-    await dragTo({ day: 0, slot: 'morning', name: '胸' }, { day: 0, slot: 'evening' })
+    // 先把週一早上的二三頭搬到週日，讓這週跟預設模板不一樣
+    await dragTo({ day: 0, slot: 'morning', name: '二三頭' }, { day: 6, slot: 'morning' })
 
     await user.click(screen.getByText('每週模板'))
     await user.click(await screen.findByText('把這週存成模板'))
@@ -243,7 +243,7 @@ describe('App — 底部拉盤', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    expect(within(cell(0, 'evening')).getByText('胸')).toBeTruthy()
+    expect(within(cell(6, 'morning')).getByText('二三頭')).toBeTruthy()
   })
 })
 

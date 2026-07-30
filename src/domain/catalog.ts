@@ -43,18 +43,18 @@ export function emptySchedule(): Schedule {
 }
 
 /**
- * 預設模板 —— Bob 給的早上課表當起始值，晚上留空自己排。
- * 一 二三頭 胸肩 / 二 間歇 背 / 三 腹肌 有氧課程
- * 四 二三頭 籃球 / 五 間歇 胸肩 / 六 腹肌 背
+ * 預設模板 —— 一天分早上、晚上兩攤，不是全擠在早上。
+ * 一 二三頭 / 胸肩　二 間歇 / 背　　三 腹肌 / 有氧課程
+ * 四 二三頭 / 籃球　五 間歇 / 胸肩　六 腹肌 / 背　　日 休
  */
 export function defaultSchedule(): Schedule {
   return {
-    0: { morning: ['arms', 'chest', 'shoulders'], evening: [] },
-    1: { morning: ['hiit', 'back'], evening: [] },
-    2: { morning: ['abs', 'cardio-class'], evening: [] },
-    3: { morning: ['arms', 'basketball'], evening: [] },
-    4: { morning: ['hiit', 'chest', 'shoulders'], evening: [] },
-    5: { morning: ['abs', 'back'], evening: [] },
+    0: { morning: ['arms'], evening: ['chest', 'shoulders'] },
+    1: { morning: ['hiit'], evening: ['back'] },
+    2: { morning: ['abs'], evening: ['cardio-class'] },
+    3: { morning: ['arms'], evening: ['basketball'] },
+    4: { morning: ['hiit'], evening: ['chest', 'shoulders'] },
+    5: { morning: ['abs'], evening: ['back'] },
     6: { morning: [], evening: [] },
   }
 }
