@@ -21,7 +21,8 @@ let setCalls: Array<{ path: string; data: unknown }> = []
 
 vi.mock('./firebase', () => ({
   firebaseEnabled: true,
-  db: { __fake: true },
+  // Firestore 改成動態載入，所以這裡也是 async 的：store 拿到的是 promise
+  getDb: () => Promise.resolve({ __fake: true }),
   USERS: ['bob', 'user1', 'user2'],
 }))
 

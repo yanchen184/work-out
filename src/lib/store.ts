@@ -1,5 +1,4 @@
-import { doc, getDoc, setDoc } from 'firebase/firestore'
-import { db, firebaseEnabled } from './firebase'
+import { firebaseEnabled, getDb } from './firebase'
 export type { UserId } from './firebase'
 import type { Schedule, Template, WeekPlan } from '../domain/types'
 import { isTemplate, isWeekPlan } from './schema'
@@ -8,6 +7,23 @@ import { createWeekPlan, mergeWeekPlans } from '../domain/week'
 import { dequeue, enqueue, flushQueue, queueSize, type PendingWrite } from './syncQueue'
 
 const LOCAL_PREFIX = 'workout'
+
+/**
+ * 取得 Firestore 實例與需要的那三個函式，全部動態載入。
+ *
+ * 為什麼不在檔案頂層 import：`firebase/firestore` 佔 gzip 138 KB，
+ * 頂層 import 會把它綁進主 chunk、擋在第一屏前面。這個 app 沒有雲端
+ * 也完全能用（localStorage 才是 source of truth），所以雲端這條路
+ * 一律等真的要讀寫時才載。
+ *
+ * 回傳 null = 雲端不可用（沒設定 env，或載入失敗），呼叫端一律當離線處理。
+ */
+async function cloud() {
+  if (!firebaseEnabled) return null
+  const [db, fs] = await Promise.all([getDb(), import('firebase/firestore')])
+  if (!db) return null
+  return { db, doc: fs.doc, getDoc: fs.getDoc, setDoc: fs.setDoc }
+}
 
 function localWeekKey(uid: string, weekKey: string): string {
   return `${LOCAL_PREFIX}:${uid}:week:${weekKey}`
@@ -64,14 +80,32 @@ export function watchCloud(listener: (ok: boolean) => void): () => void {
   return () => cloudListeners.delete(listener)
 }
 
+/** ---------- 只讀本機（同步、不碰雲端） ---------- */
+
+/**
+ * 這兩個給「先畫再說」用：開頁時同步讀本機，畫面立刻出得來，
+ * 不必等 Firestore 那 138 KB 載完。雲端版本晚點回來再覆蓋。
+ *
+ * localStorage 本來就是 source of truth，所以先畫的這一份不是暫時的假資料，
+ * 而是正確的資料——雲端只是可能更新一點。
+ */
+export function loadWeekLocal(uid: string, weekKey: string): WeekPlan | null {
+  return readLocal(localWeekKey(uid, weekKey), isWeekPlan)
+}
+
+export function loadTemplateLocal(uid: string): Schedule | null {
+  return readLocal(localTemplateKey(uid), isTemplate)?.schedule ?? null
+}
+
 /** ---------- 模板 ---------- */
 
 export async function loadTemplate(uid: string): Promise<Template> {
   const local = readLocal(localTemplateKey(uid), isTemplate)
 
-  if (firebaseEnabled && db) {
+  const c = await cloud()
+  if (c) {
     try {
-      const snap = await getDoc(doc(db, 'users', uid, 'meta', 'template'))
+      const snap = await c.getDoc(c.doc(c.db, 'users', uid, 'meta', 'template'))
       setCloudOk(true)
       if (snap.exists()) {
         const remote: unknown = snap.data()
@@ -98,11 +132,13 @@ export async function saveTemplate(uid: string, schedule: Schedule): Promise<voi
   const template: Template = { schedule, updatedAt: Date.now() }
   writeLocal(localTemplateKey(uid), template)
 
-  if (firebaseEnabled && db) {
+  if (firebaseEnabled) {
     // 先記帳再送（write-ahead）。理由見 saveWeek 的註解。
     enqueue({ kind: 'template', uid, payload: template })
     try {
-      await setDoc(doc(db, 'users', uid, 'meta', 'template'), template)
+      const c = await cloud()
+      if (!c) throw new Error('Firestore 不可用')
+      await c.setDoc(c.doc(c.db, 'users', uid, 'meta', 'template'), template)
       dequeue({ kind: 'template', uid, payload: template })
       setCloudOk(true)
     } catch (error: unknown) {
@@ -121,9 +157,10 @@ export async function loadWeek(
 ): Promise<WeekPlan> {
   const local = readLocal(localWeekKey(uid, weekKey), isWeekPlan)
 
-  if (firebaseEnabled && db) {
+  const c = await cloud()
+  if (c) {
     try {
-      const snap = await getDoc(doc(db, 'users', uid, 'weeks', weekKey))
+      const snap = await c.getDoc(c.doc(c.db, 'users', uid, 'weeks', weekKey))
       setCloudOk(true)
       if (snap.exists()) {
         const remote: unknown = snap.data()
@@ -173,18 +210,19 @@ export function saveWeekLocal(uid: string, plan: WeekPlan): void {
  * 否則補送的那筆一樣會把別台的勾洗掉。
  */
 async function pushWeek(uid: string, plan: WeekPlan): Promise<WeekPlan> {
-  if (!db) throw new Error('Firestore 未初始化')
+  const c = await cloud()
+  if (!c) throw new Error('Firestore 未初始化')
 
-  const ref = doc(db, 'users', uid, 'weeks', plan.weekKey)
+  const ref = c.doc(c.db, 'users', uid, 'weeks', plan.weekKey)
   let payload = plan
 
-  const snap = await getDoc(ref)
+  const snap = await c.getDoc(ref)
   if (snap.exists()) {
     const remote: unknown = snap.data()
     if (isWeekPlan(remote)) payload = mergeWeekPlans(remote, plan)
   }
 
-  await setDoc(ref, payload)
+  await c.setDoc(ref, payload)
   writeLocal(localWeekKey(uid, payload.weekKey), payload)
   return payload
 }
@@ -192,7 +230,7 @@ async function pushWeek(uid: string, plan: WeekPlan): Promise<WeekPlan> {
 export async function saveWeek(uid: string, plan: WeekPlan): Promise<void> {
   writeLocal(localWeekKey(uid, plan.weekKey), plan)
 
-  if (firebaseEnabled && db) {
+  if (firebaseEnabled) {
     /**
      * 先記帳再送（write-ahead），不是「失敗才記帳」。
      *
@@ -226,11 +264,12 @@ export async function saveWeek(uid: string, plan: WeekPlan): Promise<void> {
  * 要解決的那個問題，補送這條路徑同樣得走。
  */
 async function sendPending(item: PendingWrite): Promise<void> {
-  if (!db) throw new Error('Firestore 未初始化')
+  const c = await cloud()
+  if (!c) throw new Error('Firestore 未初始化')
 
   if (item.kind === 'template') {
-    await setDoc(
-      doc(db, 'users', item.uid, 'meta', 'template'),
+    await c.setDoc(
+      c.doc(c.db, 'users', item.uid, 'meta', 'template'),
       item.payload as Record<string, unknown>,
     )
     return
@@ -244,7 +283,8 @@ async function sendPending(item: PendingWrite): Promise<void> {
  * 網路恢復、頁面重新可見、以及離開頁面前都會呼叫。
  */
 export async function flushPending(): Promise<void> {
-  if (!firebaseEnabled || !db) return
+  if (!firebaseEnabled) return
+  // 佇列空的就不要載 Firestore——沒事做卻拉 138 KB 下來很蠢
   if (queueSize() === 0) return
 
   const result = await flushQueue(sendPending)

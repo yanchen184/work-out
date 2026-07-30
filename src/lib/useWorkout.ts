@@ -25,7 +25,9 @@ import {
 import {
   flushPending,
   loadTemplate,
+  loadTemplateLocal,
   loadWeek,
+  loadWeekLocal,
   saveTemplate,
   saveWeek,
   saveWeekLocal,
@@ -63,10 +65,14 @@ export function useWorkout() {
   // 雲端狀態：由 store 真的讀寫成功／失敗回報，不是看設定有沒有填
   useEffect(() => watchCloud(setCloudReady), [])
 
-  // 載入模板
+  // 載入模板：先同步讀本機把畫面撐起來，雲端版本晚點回來再覆蓋
   useEffect(() => {
     if (!uid) return
     let cancelled = false
+
+    const local = loadTemplateLocal(uid)
+    if (local) setTemplate(local)
+
     void loadTemplate(uid).then((t) => {
       if (!cancelled) setTemplate(t.schedule)
     })
@@ -75,11 +81,29 @@ export function useWorkout() {
     }
   }, [uid])
 
-  // 載入該週
+  /**
+   * 載入該週：本機先畫，雲端後補。
+   *
+   * 這裡刻意不是 `await loadWeek()` 就好——那會讓第一屏卡在 Firestore
+   * 那包 gzip 138 KB 載完之前。localStorage 是 source of truth，
+   * 先畫的那份就是對的資料，雲端回來只是可能更新一點。
+   *
+   * 實測（把那個 chunk 的回應故意卡 6 秒）：格線仍在 +79ms 出現、14 個方塊
+   * 都在。chunk 本身還是會在 +28ms 就被平行抓下來，但那是「同時下載」，
+   * 不是「擋著繪製」——兩者差很多，別看到請求時間早就以為沒拆成功。
+   */
   useEffect(() => {
     if (!uid) return
     let cancelled = false
-    setLoading(true)
+
+    const local = loadWeekLocal(uid, weekKey)
+    if (local) {
+      setPlan(local)
+      setLoading(false)
+    } else {
+      setLoading(true)
+    }
+
     void loadWeek(uid, weekKey, template).then((w) => {
       if (!cancelled) {
         setPlan(w)

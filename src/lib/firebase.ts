@@ -1,5 +1,4 @@
-import { initializeApp, type FirebaseApp } from 'firebase/app'
-import { getFirestore, type Firestore } from 'firebase/firestore'
+import type { Firestore } from 'firebase/firestore'
 
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -13,15 +12,35 @@ const config = {
 /** 沒設定 env 就整個關掉雲端，退回純本機模式 */
 export const firebaseEnabled = Boolean(config.apiKey && config.projectId)
 
-let app: FirebaseApp | undefined
-let dbInstance: Firestore | undefined
+/**
+ * Firestore 改成用到才載，不在開頁時就 import。
+ *
+ * 量過：Firebase 佔 466 KB（gzip 138 KB），是整包的 68%，但這個 app 的
+ * source of truth 是 localStorage——雲端只是同步層，第一屏完全不需要它。
+ * 原本 module 頂層就 `initializeApp`，等於把這 138 KB 綁進主 chunk 擋在
+ * 首次繪製前面。改成動態 import 後，畫面先出來，同步在背景補上。
+ *
+ * 只 import 一次：promise 存起來重複用，避免併發呼叫各自初始化一份。
+ */
+let dbPromise: Promise<Firestore | undefined> | undefined
 
-if (firebaseEnabled) {
-  app = initializeApp(config)
-  dbInstance = getFirestore(app)
+export function getDb(): Promise<Firestore | undefined> {
+  if (!firebaseEnabled) return Promise.resolve(undefined)
+  dbPromise ??= (async () => {
+    try {
+      const [{ initializeApp }, { getFirestore }] = await Promise.all([
+        import('firebase/app'),
+        import('firebase/firestore'),
+      ])
+      return getFirestore(initializeApp(config))
+    } catch (error: unknown) {
+      // 載不到就退回純本機模式，不能讓整個 app 開不起來
+      console.warn('載入 Firestore 失敗，改用純本機模式', error)
+      return undefined
+    }
+  })()
+  return dbPromise
 }
-
-export const db = dbInstance
 
 /**
  * 固定三個使用者，不做登入驗證——這是自用的打勾紀錄，
