@@ -23,6 +23,7 @@ import {
   type UserId,
 } from './firebase'
 import {
+  flushPending,
   loadTemplate,
   loadWeek,
   saveTemplate,
@@ -56,6 +57,8 @@ export function useWorkout() {
 
   const weekKey = shiftWeekKey(new Date(), weekOffset)
   const saveTimer = useRef<number | undefined>(undefined)
+  /** debounce 中、還沒送上雲端的那份；離頁時要靠它補送 */
+  const pendingRef = useRef<WeekPlan | null>(null)
 
   // 雲端狀態：由 store 真的讀寫成功／失敗回報，不是看設定有沒有填
   useEffect(() => watchCloud(setCloudReady), [])
@@ -100,18 +103,59 @@ export function useWorkout() {
 
       if (!firebaseEnabled) return
       setSyncing(true)
+      pendingRef.current = next
       window.clearTimeout(saveTimer.current)
       saveTimer.current = window.setTimeout(() => {
+        pendingRef.current = null
         void saveWeek(uid, next).finally(() => setSyncing(false))
       }, 400)
     },
     [uid],
   )
 
-  // 離開頁面前把還沒送出的雲端同步補掉
+  /**
+   * 離開頁面前把還沒送出的雲端同步補掉。
+   *
+   * 之前這裡只有 clearTimeout —— 那是「取消」還沒送出的寫入，不是 flush，
+   * 等於使用者改完立刻關分頁就掉一筆。現在改成：先把 debounce 中的那筆
+   * 直接寫掉，再把佇列裡欠的一起送。
+   */
+  const flushNow = useCallback(() => {
+    if (!uid) return
+    const pending = pendingRef.current
+    window.clearTimeout(saveTimer.current)
+    saveTimer.current = undefined
+    pendingRef.current = null
+    if (pending) void saveWeek(uid, pending)
+    void flushPending()
+  }, [uid])
+
   useEffect(() => {
-    return () => window.clearTimeout(saveTimer.current)
-  }, [])
+    if (!firebaseEnabled) return
+
+    // 網路回來 → 把離線期間欠的補送上去（「離線改完會同步到另一台」靠這條）
+    const onOnline = () => void flushPending()
+    // pagehide 比 beforeunload 可靠：iOS Safari 進背景時只發 pagehide
+    const onHide = () => flushNow()
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushNow()
+      else void flushPending()
+    }
+
+    window.addEventListener('online', onOnline)
+    window.addEventListener('pagehide', onHide)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    // 開頁就先試一次，補掉上次關頁前沒送成功的
+    void flushPending()
+
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('pagehide', onHide)
+      document.removeEventListener('visibilitychange', onVisibility)
+      flushNow()
+    }
+  }, [flushNow])
 
   const actions = {
     toggle: useCallback(

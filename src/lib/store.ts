@@ -4,6 +4,7 @@ export type { UserId } from './firebase'
 import type { Schedule, Template, WeekPlan } from '../domain/types'
 import { defaultSchedule } from '../domain/catalog'
 import { createWeekPlan } from '../domain/week'
+import { dequeue, enqueue, flushQueue, queueSize, type PendingWrite } from './syncQueue'
 
 const LOCAL_PREFIX = 'workout'
 
@@ -88,12 +89,15 @@ export async function saveTemplate(uid: string, schedule: Schedule): Promise<voi
   writeLocal(localTemplateKey(uid), template)
 
   if (firebaseEnabled && db) {
+    // 先記帳再送（write-ahead）。理由見 saveWeek 的註解。
+    enqueue({ kind: 'template', uid, payload: template })
     try {
       await setDoc(doc(db, 'users', uid, 'meta', 'template'), template)
+      dequeue({ kind: 'template', uid, payload: template })
       setCloudOk(true)
     } catch (error: unknown) {
       setCloudOk(false)
-      console.warn('同步模板到雲端失敗，已存在本機', error)
+      console.warn('同步模板到雲端失敗，留在待同步佇列', error)
     }
   }
 }
@@ -141,12 +145,57 @@ export async function saveWeek(uid: string, plan: WeekPlan): Promise<void> {
   writeLocal(localWeekKey(uid, plan.weekKey), plan)
 
   if (firebaseEnabled && db) {
+    /**
+     * 先記帳再送（write-ahead），不是「失敗才記帳」。
+     *
+     * 離線時 `setDoc` **不會 reject** —— Firestore SDK 把它收進自己的記憶體緩衝，
+     * promise 就一直懸著，所以 catch 區塊根本不會執行。實測（兩個瀏覽器 context）：
+     * 離線打勾後直接關掉分頁，SDK 的緩衝隨記憶體消失，另一台裝置永遠讀不到，
+     * 但本機 localStorage 有紀錄，使用者看到勾以為同步了。
+     *
+     * 所以要在送出「之前」就把這筆寫進持久化佇列，確認送達才移除。
+     */
+    const item: PendingWrite = { kind: 'week', uid, weekKey: plan.weekKey, payload: plan }
+    enqueue(item)
     try {
       await setDoc(doc(db, 'users', uid, 'weeks', plan.weekKey), plan)
+      dequeue(item)
       setCloudOk(true)
     } catch (error: unknown) {
       setCloudOk(false)
-      console.warn('同步週計畫到雲端失敗，已存在本機', error)
+      console.warn('同步週計畫到雲端失敗，留在待同步佇列', error)
     }
   }
+}
+
+/** ---------- 待同步佇列 ---------- */
+
+/** 把一筆待同步的寫入真的送上 Firestore */
+async function sendPending(item: PendingWrite): Promise<void> {
+  if (!db) throw new Error('Firestore 未初始化')
+
+  const ref =
+    item.kind === 'week'
+      ? doc(db, 'users', item.uid, 'weeks', item.weekKey as string)
+      : doc(db, 'users', item.uid, 'meta', 'template')
+
+  await setDoc(ref, item.payload as Record<string, unknown>)
+}
+
+/**
+ * 把離線期間欠的寫入補送上雲端。
+ * 網路恢復、頁面重新可見、以及離開頁面前都會呼叫。
+ */
+export async function flushPending(): Promise<void> {
+  if (!firebaseEnabled || !db) return
+  if (queueSize() === 0) return
+
+  const result = await flushQueue(sendPending)
+  // 有送出去才算真的通了；全掛就維持離線狀態，別對使用者說謊
+  if (result.sent > 0) setCloudOk(true)
+  else if (result.failed > 0) setCloudOk(false)
+}
+
+export function pendingCount(): number {
+  return queueSize()
 }
