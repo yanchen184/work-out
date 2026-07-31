@@ -479,12 +479,12 @@ describe('mergeWeekPlans — 兩台裝置各自離線打勾', () => {
     expect(mergeWeekPlans(a, b).checked).not.toContain(checkKey(3, 'evening', 'basketball'))
   })
 
-  it('項目被換走但還欠在補做池 → 那個勾要留著', () => {
+  it('較新版本把項目移進補做且未打勾 → 採較新狀態，不復活舊勾', () => {
     const a = { ...toggleCheck(base, 1, 'evening', 'back'), updatedAt: 1000 }
     const b = { ...dropToMakeup(base, 'back', 1, 'evening'), updatedAt: 2000 }
 
     const merged = mergeWeekPlans(a, b)
-    expect(merged.checked).toContain(checkKey(1, 'evening', 'back'))
+    expect(merged.checked).not.toContain(checkKey(1, 'evening', 'back'))
   })
 
   it('不改動傳進來的兩份計畫（immutability）', () => {

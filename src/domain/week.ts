@@ -413,11 +413,8 @@ export function mergeWeekPlans(a: WeekPlan, b: WeekPlan): WeekPlan {
   const bKeys = new Set(b.checked)
   const aIsSubset = a.checked.every((key) => bKeys.has(key))
   const bIsSubset = b.checked.every((key) => aKeys.has(key))
-  const sameLayout =
-    JSON.stringify(a.schedule) === JSON.stringify(b.schedule) &&
-    JSON.stringify(a.makeups) === JSON.stringify(b.makeups)
   const merged =
-    sameLayout && (aIsSubset || bIsSubset)
+    aIsSubset || bIsSubset
       ? [...newer.checked]
       : [...new Set([...a.checked, ...b.checked])]
 
