@@ -271,6 +271,8 @@ export interface MoveResult {
 export function placeDetachedGroup(
   plan: WeekPlan,
   groupId: string,
+  fromDay: DayIndex,
+  fromSlot: SlotKey,
   to: DropTarget,
 ): MoveResult {
   const none = { plan, displaced: null }
@@ -293,7 +295,14 @@ export function placeDetachedGroup(
       checked: displaced
         ? plan.checked.filter((key) => key !== checkKey(to.day, to.slot, displaced))
         : plan.checked,
-      makeups: plan.makeups.filter((item) => item.groupId !== groupId),
+      makeups: plan.makeups.filter(
+        (item) =>
+          !(
+            item.groupId === groupId &&
+            item.fromDay === fromDay &&
+            item.fromSlot === fromSlot
+          ),
+      ),
       updatedAt: nextUpdatedAt(plan),
     },
     displaced,
@@ -391,11 +400,18 @@ export function dropToMakeup(
 }
 
 /** 標記某補做項目本週跳過 */
-export function dismissMakeup(plan: WeekPlan, groupId: string): WeekPlan {
+export function dismissMakeup(
+  plan: WeekPlan,
+  groupId: string,
+  fromDay: DayIndex,
+  fromSlot: SlotKey,
+): WeekPlan {
   return {
     ...plan,
     makeups: plan.makeups.map((m) =>
-      m.groupId === groupId ? { ...m, dismissed: true } : m,
+      m.groupId === groupId && m.fromDay === fromDay && m.fromSlot === fromSlot
+        ? { ...m, dismissed: true }
+        : m,
     ),
     updatedAt: nextUpdatedAt(plan),
   }

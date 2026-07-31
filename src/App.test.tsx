@@ -258,6 +258,43 @@ describe('App — 格線外與垃圾桶都移到補做', () => {
     expect(document.querySelector('.makeup')).toBeNull()
   })
 
+  it('兩個二三頭補做只會移除實際拖回的那一顆', async () => {
+    await renderApp()
+
+    const original = document.elementFromPoint
+    document.elementFromPoint = () => null
+
+    for (const day of [0, 3]) {
+      fireEvent.pointerDown(tile(day, 'morning', '二三頭'), {
+        clientX: 10,
+        clientY: 10,
+      })
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 220))
+      })
+      await act(async () => {
+        fireEvent.pointerUp(window, { clientX: 5, clientY: 700 })
+      })
+    }
+
+    const makeup = document.querySelector('.makeup') as HTMLElement
+    expect(within(makeup).getAllByText('二三頭')).toHaveLength(2)
+
+    const firstMakeupTile = within(makeup).getAllByText('二三頭')[0].closest('.tile') as HTMLElement
+    document.elementFromPoint = () => cell(6, 'morning')
+    fireEvent.pointerDown(firstMakeupTile, { clientX: 20, clientY: 650 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 220))
+    })
+    await act(async () => {
+      fireEvent.pointerUp(window, { clientX: 200, clientY: 500 })
+    })
+    document.elementFromPoint = original
+
+    expect(within(cell(6, 'morning')).getByText('二三頭')).toBeTruthy()
+    expect(within(document.querySelector('.makeup') as HTMLElement).getAllByText('二三頭')).toHaveLength(1)
+  })
+
   it('已打勾的放到格線外會從原格消失，但不進補做', async () => {
     const user = userEvent.setup()
     await renderApp()

@@ -190,8 +190,27 @@ describe('dismissMakeup — 本週跳過', () => {
   it('標記跳過後 dismissed 為 true', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
     const removed = removeFromSlot(plan, 1, 'evening', 'back')
-    const dismissed = dismissMakeup(removed, 'back')
+    const dismissed = dismissMakeup(removed, 'back', 1, 'evening')
     expect(dismissed.makeups.find((m) => m.groupId === 'back')?.dismissed).toBe(true)
+  })
+
+  it('同部位有兩筆時，只略過指定來源的那一筆', () => {
+    const plan = createWeekPlan('2026-W31', defaultSchedule())
+    const monday = dropToMakeup(plan, 'arms', 0, 'morning')
+    const twoArms = dropToMakeup(monday, 'arms', 3, 'morning')
+
+    const dismissed = dismissMakeup(twoArms, 'arms', 0, 'morning')
+
+    expect(
+      dismissed.makeups.find(
+        (m) => m.groupId === 'arms' && m.fromDay === 0 && m.fromSlot === 'morning',
+      )?.dismissed,
+    ).toBe(true)
+    expect(
+      dismissed.makeups.find(
+        (m) => m.groupId === 'arms' && m.fromDay === 3 && m.fromSlot === 'morning',
+      )?.dismissed,
+    ).toBe(false)
   })
 })
 
@@ -424,7 +443,10 @@ describe('placeDetachedGroup — 把補做方塊拖回課表', () => {
     const base = createWeekPlan('2026-W31', defaultSchedule())
     const inMakeup = dropToMakeup(base, 'arms', 0, 'morning')
 
-    const result = placeDetachedGroup(inMakeup, 'arms', { day: 6, slot: 'morning' })
+    const result = placeDetachedGroup(inMakeup, 'arms', 0, 'morning', {
+      day: 6,
+      slot: 'morning',
+    })
 
     expect(result.plan.schedule[6].morning).toContain('arms')
     expect(result.plan.makeups.map((item) => item.groupId)).not.toContain('arms')
@@ -435,7 +457,7 @@ describe('placeDetachedGroup — 把補做方塊拖回課表', () => {
     const base = createWeekPlan('2026-W31', defaultSchedule())
     const inMakeup = dropToMakeup(base, 'arms', 0, 'morning')
 
-    const result = placeDetachedGroup(inMakeup, 'arms', {
+    const result = placeDetachedGroup(inMakeup, 'arms', 0, 'morning', {
       day: 1,
       slot: 'morning',
       displaceGroupId: 'hiit',
@@ -444,6 +466,30 @@ describe('placeDetachedGroup — 把補做方塊拖回課表', () => {
     expect(result.plan.schedule[1].morning).toContain('arms')
     expect(result.plan.schedule[1].morning).not.toContain('hiit')
     expect(result.displaced).toBe('hiit')
+  })
+
+  it('同部位有兩筆補做時，只移除實際拖回的來源那一筆', () => {
+    const base = createWeekPlan('2026-W31', defaultSchedule())
+    const monday = dropToMakeup(base, 'arms', 0, 'morning')
+    const twoArms = dropToMakeup(monday, 'arms', 3, 'morning')
+
+    const result = placeDetachedGroup(twoArms, 'arms', 0, 'morning', {
+      day: 6,
+      slot: 'morning',
+    })
+
+    expect(result.plan.makeups).toContainEqual({
+      groupId: 'arms',
+      fromDay: 3,
+      fromSlot: 'morning',
+      dismissed: false,
+    })
+    expect(result.plan.makeups).not.toContainEqual({
+      groupId: 'arms',
+      fromDay: 0,
+      fromSlot: 'morning',
+      dismissed: false,
+    })
   })
 })
 

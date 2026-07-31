@@ -30,7 +30,7 @@ export default function App() {
     (held: Held, zone: DropZone, displaceGroupId?: string): string | null => {
       const target = { day: zone.day, slot: zone.slot, displaceGroupId }
       return held.detached
-        ? placeDetached(held.groupId, target)
+        ? placeDetached(held.groupId, held.fromDay, held.fromSlot, target)
         : move(
             { day: held.fromDay, slot: held.fromSlot, groupId: held.groupId },
             target,
@@ -215,7 +215,7 @@ export default function App() {
                     />
                     <button
                       className="mk-x"
-                      onClick={() => w.dismiss(m.groupId)}
+                      onClick={() => w.dismiss(m.groupId, m.fromDay, m.fromSlot)}
                       aria-label={`不補做 ${group.name}`}
                     >
                       ×

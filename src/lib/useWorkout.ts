@@ -252,8 +252,8 @@ export function useWorkout() {
     ),
 
     dismiss: useCallback(
-      (groupId: string) => {
-        if (plan) persist(dismissMakeup(plan, groupId))
+      (groupId: string, fromDay: DayIndex, fromSlot: SlotKey) => {
+        if (plan) persist(dismissMakeup(plan, groupId, fromDay, fromSlot))
       },
       [plan, persist],
     ),
@@ -274,9 +274,14 @@ export function useWorkout() {
 
     /** 把補做池或被頂出的方塊放回課表。 */
     placeDetached: useCallback(
-      (groupId: string, to: DropTarget): string | null => {
+      (
+        groupId: string,
+        fromDay: DayIndex,
+        fromSlot: SlotKey,
+        to: DropTarget,
+      ): string | null => {
         if (!plan) return null
-        const result = placeDetachedGroup(plan, groupId, to)
+        const result = placeDetachedGroup(plan, groupId, fromDay, fromSlot, to)
         if (result.plan !== plan) persist(result.plan)
         return result.displaced
       },
