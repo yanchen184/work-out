@@ -3,7 +3,7 @@ import {
   addToSlot,
   createWeekPlan,
   dismissMakeup,
-  dropToMakeup,
+  discardGroup,
   formatWeekRange,
   mergeWeekPlans,
   mondayOfWeekKey,
@@ -389,30 +389,29 @@ describe('moveGroup — 拖放：拿起來放到別格', () => {
   })
 })
 
-describe('dropToMakeup — 手上的項目放到空白處 → 進補做', () => {
-  it('沒打勾的項目 → 進補做池，記住原本在哪', () => {
+describe('discardGroup — 手上的項目放到格線外 → 丟棄', () => {
+  it('沒打勾的項目 → 從原時段刪除，不進補做', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const next = dropToMakeup(plan, 'back', 1, 'evening')
+    const next = discardGroup(plan, 'back', 1, 'evening')
 
-    const m = next.makeups.find((x) => x.groupId === 'back')
-    expect(m).toBeDefined()
-    expect(m?.fromDay).toBe(1)
-    expect(m?.fromSlot).toBe('evening')
-    expect(m?.dismissed).toBe(false)
-  })
-
-  it('已打勾的項目 → 不進補做池（已經做過了，不算欠）', () => {
-    let plan = createWeekPlan('2026-W31', defaultSchedule())
-    plan = toggleCheck(plan, 1, 'evening', 'back')
-    const next = dropToMakeup(plan, 'back', 1, 'evening')
+    expect(next.schedule[1].evening).not.toContain('back')
     expect(next.makeups.map((m) => m.groupId)).not.toContain('back')
   })
 
-  it('同一項不會在補做池重複兩筆', () => {
+  it('已打勾的項目 → 方塊與勾一起刪除', () => {
+    let plan = createWeekPlan('2026-W31', defaultSchedule())
+    plan = toggleCheck(plan, 1, 'evening', 'back')
+    const next = discardGroup(plan, 'back', 1, 'evening')
+    expect(next.schedule[1].evening).not.toContain('back')
+    expect(next.checked).not.toContain(checkKey(1, 'evening', 'back'))
+    expect(next.makeups.map((m) => m.groupId)).not.toContain('back')
+  })
+
+  it('已經不在來源格的項目 → 不重複改資料', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const once = dropToMakeup(plan, 'back', 1, 'evening')
-    const twice = dropToMakeup(once, 'back', 1, 'evening')
-    expect(twice.makeups.filter((m) => m.groupId === 'back')).toHaveLength(1)
+    const once = discardGroup(plan, 'back', 1, 'evening')
+    const twice = discardGroup(once, 'back', 1, 'evening')
+    expect(twice).toBe(once)
   })
 })
 
@@ -481,7 +480,7 @@ describe('mergeWeekPlans — 兩台裝置各自離線打勾', () => {
 
   it('較新版本把項目移進補做且未打勾 → 採較新狀態，不復活舊勾', () => {
     const a = { ...toggleCheck(base, 1, 'evening', 'back'), updatedAt: 1000 }
-    const b = { ...dropToMakeup(base, 'back', 1, 'evening'), updatedAt: 2000 }
+    const b = { ...discardGroup(base, 'back', 1, 'evening'), updatedAt: 2000 }
 
     const merged = mergeWeekPlans(a, b)
     expect(merged.checked).not.toContain(checkKey(1, 'evening', 'back'))

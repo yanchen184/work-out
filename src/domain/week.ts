@@ -232,7 +232,7 @@ export interface MoveResult {
   readonly plan: WeekPlan
   /**
    * 被頂出來的項目 —— 它現在「在手上」，還沒進補做池。
-   * 使用者可以再把它放到別格，或放到空白處（走 dropToMakeup）。
+   * 使用者可以再把它放到別格，或放到格線外直接丟棄。
    */
   readonly displaced: string | null
 }
@@ -289,27 +289,39 @@ export function moveGroup(plan: WeekPlan, from: DragSource, to: DropTarget): Mov
   }
 }
 
-/**
- * 手上拿著的項目放到空白處 → 進補做池。
- * 已打勾的不算欠（做過了），沿用 removeFromSlot 的規則。
- */
-export function dropToMakeup(
+/** 手上的項目放到 7 天 × 早晚格線外 → 直接從本週丟棄。 */
+export function discardGroup(
   plan: WeekPlan,
   groupId: string,
   fromDay: DayIndex,
   fromSlot: SlotKey,
 ): WeekPlan {
-  const wasChecked = plan.checked.includes(checkKey(fromDay, fromSlot, groupId))
-  if (wasChecked) return plan
+  const source = plan.schedule[fromDay][fromSlot]
+  const nextSource = source.filter((item) => item !== groupId)
+  const key = checkKey(fromDay, fromSlot, groupId)
+  const checked = plan.checked.filter((item) => item !== key)
+  const makeups = plan.makeups.filter(
+    (item) =>
+      !(
+        item.groupId === groupId &&
+        item.fromDay === fromDay &&
+        item.fromSlot === fromSlot
+      ),
+  )
 
+  // 被頂出來黏在手上的項目已不在課表裡；沒有其他殘留就不用重存。
+  if (
+    nextSource.length === source.length &&
+    checked.length === plan.checked.length &&
+    makeups.length === plan.makeups.length
+  ) {
+    return plan
+  }
   return {
     ...plan,
-    makeups: [
-      ...plan.makeups.filter(
-        (m) => !(m.groupId === groupId && m.fromDay === fromDay && m.fromSlot === fromSlot),
-      ),
-      { groupId, fromDay, fromSlot, dismissed: false },
-    ],
+    schedule: replaceSlot(plan.schedule, fromDay, fromSlot, nextSource),
+    checked,
+    makeups,
     updatedAt: nextUpdatedAt(plan),
   }
 }

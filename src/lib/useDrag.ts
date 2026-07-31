@@ -4,7 +4,7 @@ import type { DayIndex, SlotKey } from '../domain/types'
 /** 手上拿著的那一顆 */
 export interface Held {
   readonly groupId: string
-  /** 它原本在哪（放到空白處時要記進補做池） */
+  /** 它原本在哪（放到格線外時要從該格刪除） */
   readonly fromDay: DayIndex
   readonly fromSlot: SlotKey
   /** 目前手指位置（畫浮起的方塊用） */
@@ -30,7 +30,7 @@ const MOVE_TOLERANCE = 10
 interface UseDragOptions {
   /** 放到某一格。回傳被頂出來的項目 id，沒有就 null */
   readonly onDropInto: (held: Held, zone: DropZone, displaceGroupId?: string) => string | null
-  /** 放到空白處 */
+  /** 放到 7 天 × 早晚格線外，直接丟棄 */
   readonly onDropAway: (held: Held) => void
 }
 
@@ -116,7 +116,7 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
 
       const zone = zoneAt(e.clientX, e.clientY)
       if (!zone) {
-        // 放到空白處 → 進補做
+        // 不在星期一到日的早／晚格子裡 → 直接丟棄
         onDropAway(current)
         setHeld(null)
         setHoverZone(null)

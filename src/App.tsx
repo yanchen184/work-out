@@ -235,7 +235,7 @@ export default function App() {
 
       {held && (
         <div className="hand-hint">
-          {held.displaced ? `${groupById(held.groupId)?.name} 在你手上` : '放到空白處 → 進補做'}
+          {held.displaced ? `${groupById(held.groupId)?.name} 在你手上` : '放到格線外 → 丟棄'}
         </div>
       )}
 

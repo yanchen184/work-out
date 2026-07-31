@@ -152,8 +152,8 @@ describe('App — 拖放', () => {
   })
 })
 
-describe('App — 補做池', () => {
-  it('手上的方塊放到空白處 → 進補做', async () => {
+describe('App — 格線外丟棄', () => {
+  it('手上的方塊放到 7 天 × 早晚格線外 → 從本週刪除', async () => {
     await renderApp()
 
     const source = tile(0, 'morning', '二三頭')
@@ -170,12 +170,11 @@ describe('App — 補做池', () => {
     })
     document.elementFromPoint = original
 
-    const makeup = document.querySelector('.makeup') as HTMLElement
-    expect(makeup).toBeTruthy()
-    expect(within(makeup).getByText('二三頭')).toBeTruthy()
+    expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
+    expect(document.querySelector('.makeup')).toBeNull()
   })
 
-  it('已打勾的丟到空白處不算欠，不進補做', async () => {
+  it('已打勾的丟到格線外也直接刪除，且不進補做', async () => {
     const user = userEvent.setup()
     await renderApp()
 
@@ -194,6 +193,7 @@ describe('App — 補做池', () => {
     })
     document.elementFromPoint = original
 
+    expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
     expect(document.querySelector('.makeup')).toBeNull()
   })
 })
