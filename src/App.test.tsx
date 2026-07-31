@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, within, act, cleanup, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
@@ -146,13 +146,60 @@ describe('App — 拖放', () => {
 
     // 二三頭 進到週二早上
     expect(within(cell(1, 'morning')).getByText('二三頭')).toBeTruthy()
-    // 被頂出來的那顆顯示在手上，還沒落地就不該進補做池
-    expect(screen.getByText(/在你手上/)).toBeTruthy()
+    // 被頂出來的那顆仍浮在手上，垃圾桶也會保持可用，還沒落地就不進補做池
+    expect(document.querySelector('.tile.is-floating')).toBeTruthy()
+    expect(screen.getByLabelText('拖到這裡丟棄')).toBeTruthy()
     expect(document.querySelector('.makeup')).toBeNull()
   })
 })
 
 describe('App — 格線外丟棄', () => {
+  it('按下時 capture 同一支手指，滑出原方塊後仍收得到放手', async () => {
+    await renderApp()
+
+    const source = tile(0, 'morning', '二三頭')
+    const capture = vi.fn()
+    source.setPointerCapture = capture
+
+    fireEvent.pointerDown(source, { pointerId: 7, clientX: 10, clientY: 10 })
+
+    expect(capture).toHaveBeenCalledWith(7)
+  })
+
+  it('往底部中央滑時顯示垃圾桶吸附，放手後刪除', async () => {
+    await renderApp()
+
+    const source = tile(0, 'morning', '二三頭')
+    const original = document.elementFromPoint
+    document.elementFromPoint = () => document.querySelector('.trash-drop')
+
+    fireEvent.pointerDown(source, { pointerId: 7, clientX: 10, clientY: 10 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 220))
+    })
+    fireEvent.pointerMove(window, {
+      pointerId: 7,
+      clientX: window.innerWidth / 2,
+      clientY: window.innerHeight - 30,
+    })
+
+    expect(screen.getByLabelText('拖到這裡丟棄')).toHaveClass('is-active')
+    expect(document.querySelector('.tile.is-floating')).toHaveClass('is-absorbed')
+    expect(screen.getByText('放手丟棄')).toBeTruthy()
+
+    await act(async () => {
+      fireEvent.pointerUp(window, {
+        pointerId: 7,
+        clientX: window.innerWidth / 2,
+        clientY: window.innerHeight - 30,
+      })
+    })
+    document.elementFromPoint = original
+
+    expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
+    expect(screen.queryByLabelText('拖到這裡丟棄')).toBeNull()
+  })
+
   it('手上的方塊放到 7 天 × 早晚格線外 → 從本週刪除', async () => {
     await renderApp()
 

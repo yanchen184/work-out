@@ -26,6 +26,9 @@ export interface DropZone {
 const HOLD_MS = 180
 /** 按住期間手指移動超過這距離就當成捲動，不算拿起 */
 const MOVE_TOLERANCE = 10
+/** 手指進到底部中央這塊範圍，方塊就吸到垃圾桶。 */
+const TRASH_WIDTH = 220
+const TRASH_HEIGHT = 150
 
 interface UseDragOptions {
   /** 放到某一格。回傳被頂出來的項目 id，沒有就 null */
@@ -41,9 +44,12 @@ interface UseDragOptions {
 export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
   const [held, setHeld] = useState<Held | null>(null)
   const [hoverZone, setHoverZone] = useState<DropZone | null>(null)
+  const [trashActive, setTrashActive] = useState(false)
 
   const holdTimer = useRef<number | undefined>(undefined)
   const pending = useRef<{ x: number; y: number } | null>(null)
+  /** iOS 的 pointercancel 常把座標清成 0；保留最後真的摸到的位置。 */
+  const lastPoint = useRef<{ x: number; y: number } | null>(null)
   const heldRef = useRef<Held | null>(null)
   heldRef.current = held
 
@@ -70,6 +76,13 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
     return tile?.dataset.group
   }, [])
 
+  const isOverTrash = useCallback(
+    (x: number, y: number): boolean =>
+      y >= window.innerHeight - TRASH_HEIGHT &&
+      Math.abs(x - window.innerWidth / 2) <= TRASH_WIDTH / 2,
+    [],
+  )
+
   const begin = useCallback(
     (e: React.PointerEvent, groupId: string, fromDay: DayIndex, fromSlot: SlotKey) => {
       // 已經有東西在手上時，這一下是「放下」不是「拿起」
@@ -79,6 +92,19 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
       const startX = e.clientX
       const startY = e.clientY
       pending.current = { x: startX, y: startY }
+      lastPoint.current = { x: startX, y: startY }
+
+      /*
+       * 從 pointerdown 當下就 capture。少這行時，手指滑出原方塊後，
+       * iOS Safari 可能把後續事件交回瀏覽器，頁面永遠收不到 pointerup，
+       * 畫面看起來就會是「拿得起來，但丟不掉」。
+       */
+      const target = e.currentTarget as HTMLElement
+      try {
+        target.setPointerCapture?.(e.pointerId)
+      } catch {
+        // 舊版 Safari 不支援時仍可走 window listener。
+      }
 
       holdTimer.current = window.setTimeout(() => {
         if (!pending.current) return
@@ -101,29 +127,46 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
   )
 
   // 拖曳中：跟手指、算落點
+  const dragging = held !== null
+
   useEffect(() => {
-    if (!held) return
+    if (!dragging) return
 
     function onMove(e: PointerEvent) {
       e.preventDefault()
+      lastPoint.current = { x: e.clientX, y: e.clientY }
       setHeld((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h))
-      setHoverZone(zoneAt(e.clientX, e.clientY))
+      const overTrash = isOverTrash(e.clientX, e.clientY)
+      setTrashActive(overTrash)
+      setHoverZone(overTrash ? null : zoneAt(e.clientX, e.clientY))
     }
 
-    function onUp(e: PointerEvent) {
+    function finishAt(x: number, y: number) {
       const current = heldRef.current
       if (!current) return
 
-      const zone = zoneAt(e.clientX, e.clientY)
+      if (isOverTrash(x, y)) {
+        onDropAway(current)
+        setHeld(null)
+        setHoverZone(null)
+        setTrashActive(false)
+        lastPoint.current = null
+        navigator.vibrate?.([10, 35, 18])
+        return
+      }
+
+      const zone = zoneAt(x, y)
       if (!zone) {
         // 不在星期一到日的早／晚格子裡 → 直接丟棄
         onDropAway(current)
         setHeld(null)
         setHoverZone(null)
+        setTrashActive(false)
+        lastPoint.current = null
         return
       }
 
-      const displaceId = tileAt(e.clientX, e.clientY)
+      const displaceId = tileAt(x, y)
       const kicked = onDropInto(current, zone, displaceId)
 
       if (kicked) {
@@ -133,27 +176,38 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
           groupId: kicked,
           fromDay: zone.day,
           fromSlot: zone.slot,
-          x: e.clientX,
-          y: e.clientY,
+          x,
+          y,
           dx: current.dx,
           dy: current.dy,
           displaced: true,
         })
       } else {
         setHeld(null)
+        lastPoint.current = null
       }
       setHoverZone(null)
+      setTrashActive(false)
+    }
+
+    function onUp(e: PointerEvent) {
+      finishAt(e.clientX, e.clientY)
+    }
+
+    function onCancel() {
+      const point = lastPoint.current
+      if (point) finishAt(point.x, point.y)
     }
 
     window.addEventListener('pointermove', onMove, { passive: false })
     window.addEventListener('pointerup', onUp)
-    window.addEventListener('pointercancel', onUp)
+    window.addEventListener('pointercancel', onCancel)
     return () => {
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
-      window.removeEventListener('pointercancel', onUp)
+      window.removeEventListener('pointercancel', onCancel)
     }
-  }, [held, zoneAt, tileAt, onDropInto, onDropAway])
+  }, [dragging, zoneAt, tileAt, isOverTrash, onDropInto, onDropAway])
 
   /** 按住還沒到 HOLD_MS 就移動 → 當成捲動，取消拿起 */
   const maybeCancel = useCallback(
@@ -165,5 +219,5 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
     [clearPending],
   )
 
-  return { held, hoverZone, begin, maybeCancel, endPending: clearPending }
+  return { held, hoverZone, trashActive, begin, maybeCancel, endPending: clearPending }
 }

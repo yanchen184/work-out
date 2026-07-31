@@ -225,6 +225,7 @@ export default function App() {
               group={group}
               done={false}
               floating
+              absorbed={drag.trashActive}
               style={{
                 left: held.x - held.dx,
                 top: held.y - held.dy,
@@ -234,8 +235,14 @@ export default function App() {
         })()}
 
       {held && (
-        <div className="hand-hint">
-          {held.displaced ? `${groupById(held.groupId)?.name} 在你手上` : '放到格線外 → 丟棄'}
+        <div
+          className={`trash-drop${drag.trashActive ? ' is-active' : ''}`}
+          aria-label="拖到這裡丟棄"
+        >
+          <span className="trash-icon"><UiIcon name="trash" /></span>
+          <span className="trash-label">
+            {drag.trashActive ? '放手丟棄' : '拖到這裡刪除'}
+          </span>
         </div>
       )}
 

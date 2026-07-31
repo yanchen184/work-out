@@ -1,4 +1,4 @@
-export type UiIconName = 'progress' | 'template' | 'save' | 'reset' | 'info'
+export type UiIconName = 'progress' | 'template' | 'save' | 'reset' | 'info' | 'trash'
 
 export function UiIcon({ name }: { readonly name: UiIconName }) {
   return (
@@ -53,6 +53,13 @@ function iconFor(name: UiIconName) {
         <>
           <circle cx="12" cy="12" r="8.5" />
           <path d="M12 10.8v5.3M12 7.6h.01" />
+        </>
+      )
+    case 'trash':
+      return (
+        <>
+          <path className="trash-lid" d="M4 7h16M9 7V4.7h6V7" />
+          <path className="trash-body" d="m6 7 1 13h10l1-13M10 11v5M14 11v5" />
         </>
       )
   }

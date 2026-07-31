@@ -20,6 +20,16 @@
   touch-action: none;
 }
 
+/*
+ * touch-action 必須在手勢「開始前」就設定，拖起來後才加到 .app 來不及。
+ * 否則 iOS Safari 會在手指滑出方塊時接管手勢並送 pointercancel。
+ */
+.tile {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* ── 標題列 ───────────────────────────────────── */
 
 .hd {
@@ -555,6 +565,23 @@
   height: 34px;
 }
 
+.tile.is-floating.is-absorbed {
+  left: 50% !important;
+  top: auto !important;
+  bottom: calc(38px + env(safe-area-inset-bottom));
+  z-index: 94;
+  opacity: 0.82;
+  transform: translateX(-50%) scale(0.58) rotate(0);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.9),
+    0 8px 18px rgba(190, 48, 55, 0.28);
+  transition:
+    left 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    bottom 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.16s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.16s ease;
+}
+
 @keyframes lift {
   from {
     transform: scale(1) rotate(0deg);
@@ -564,33 +591,91 @@
   }
 }
 
-.hand-hint {
+.trash-drop {
   position: fixed;
   left: 50%;
-  /* 要浮在底部兩顆按鈕「上方」，壓到按鈕上會兩邊都看不清楚 */
-  bottom: calc(78px + env(safe-area-inset-bottom));
+  bottom: calc(12px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  z-index: 91;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: rgba(12, 12, 14, 0.96);
-  border: 1px solid var(--line-strong);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 12.5px;
-  white-space: nowrap;
+  z-index: 92;
+  width: 112px;
+  height: 92px;
+  border-radius: 28px 28px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #b53b43;
+  background: color-mix(in srgb, #fff 90%, #ffd9db);
+  border: 1.5px solid color-mix(in srgb, #d9535c 45%, white);
+  box-shadow:
+    0 14px 32px rgba(73, 22, 25, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
   pointer-events: none;
-  animation: rise 0.2s ease;
+  animation: trash-rise 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    width 0.16s ease,
+    height 0.16s ease,
+    color 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
-@keyframes rise {
+.trash-drop.is-active {
+  width: 132px;
+  height: 108px;
+  color: #fff;
+  background: linear-gradient(155deg, #f16870, #c8343e);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 0 0 8px rgba(222, 66, 76, 0.13),
+    0 18px 36px rgba(137, 29, 36, 0.34);
+  transform: translateX(-50%) scale(1.04);
+}
+
+.trash-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+}
+
+.trash-icon .ui-icon {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.trash-drop.is-active .trash-lid {
+  transform: translateY(-2px) rotate(-12deg);
+  transform-origin: 7px 7px;
+}
+
+.trash-lid {
+  transition: transform 0.16s ease;
+}
+
+.trash-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.app.is-dragging .tabs {
+  opacity: 0.18;
+  transform: scale(0.98);
+}
+
+@keyframes trash-rise {
   from {
     opacity: 0;
-    transform: translate(-50%, 8px);
+    transform: translate(-50%, 24px) scale(0.82);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translate(-50%, 0) scale(1);
   }
 }
 
