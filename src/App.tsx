@@ -3,7 +3,13 @@ import './App.css'
 import { useWorkout } from './lib/useWorkout'
 import { CATALOG, DAY_LABELS, groupById } from './domain/catalog'
 import { formatWeekRange, overallProgress, weekProgress } from './domain/week'
-import { checkKey, type DayIndex, type ExtraActivity, type SlotKey } from './domain/types'
+import {
+  checkKey,
+  type DayIndex,
+  type ExtraActivity,
+  type MuscleGroup,
+  type SlotKey,
+} from './domain/types'
 import { USERS } from './lib/firebase'
 import { Tile } from './components/Tile'
 import { TrainingIcon } from './components/TrainingIcon'
@@ -18,6 +24,17 @@ type Panel = 'progress' | 'template' | null
 
 /** 挑項目的小視窗：往某格加東西 */
 type Picker = { day: DayIndex; slot: SlotKey } | null
+
+function extraAsGroup(activity: ExtraActivity): MuscleGroup {
+  return {
+    id: activity.id,
+    name: activity.name,
+    targetAmount: 0,
+    unit: 'minutes',
+    targetSessions: 1,
+    tone: 'teal',
+  }
+}
 
 export default function App() {
   const w = useWorkout()
@@ -74,6 +91,9 @@ export default function App() {
   }
 
   const plan = w.plan
+  const customCatalog = (plan.extraActivities ?? []).map(extraAsGroup)
+  const customById = new Map(customCatalog.map((group) => [group.id, group]))
+  const resolveGroup = (id: string) => groupById(id) ?? customById.get(id)
   const overall = overallProgress(plan)
   const percent = overall.total === 0 ? 0 : Math.round((overall.done / overall.total) * 100)
   const held = drag.held
@@ -140,7 +160,7 @@ export default function App() {
                   data-slot={slot}
                 >
                   {items.map((gid) => {
-                    const group = groupById(gid)
+                    const group = resolveGroup(gid)
                     if (!group) return null
                     const done = plan.checked.includes(checkKey(day, slot, gid))
                     // 同一個部位可能出現在好幾天，凹槽只能留在「被拿走的那一格」
@@ -189,7 +209,7 @@ export default function App() {
             {plan.makeups
               .filter((m) => !m.dismissed)
               .map((m) => {
-                const group = groupById(m.groupId)
+                const group = resolveGroup(m.groupId)
                 if (!group) return null
                 return (
                   <div
@@ -241,7 +261,7 @@ export default function App() {
       {/* 拿在手上、跟著手指跑的那一顆 */}
       {held &&
         (() => {
-          const group = groupById(held.groupId)
+          const group = resolveGroup(held.groupId)
           if (!group) return null
           return (
             <Tile
@@ -258,6 +278,7 @@ export default function App() {
 
       {picker && (
         <PickerSheet
+          groups={[...CATALOG, ...customCatalog]}
           onClose={() => setPicker(null)}
           onPick={(gid) => {
             w.add(picker.day, picker.slot, gid)
@@ -269,7 +290,6 @@ export default function App() {
       {panel === 'progress' && (
         <ProgressSheet
           rows={weekProgress(plan)}
-          extras={plan.extraActivities ?? []}
           percent={percent}
           onAdd={w.addExtra}
           onRemove={w.removeExtra}
@@ -384,14 +404,12 @@ function Sheet({
 
 function ProgressSheet({
   rows,
-  extras,
   percent,
   onAdd,
   onRemove,
   onClose,
 }: {
   rows: ReturnType<typeof weekProgress>
-  extras: readonly ExtraActivity[]
   percent: number
   onAdd: (name: string) => void
   onRemove: (id: string) => void
@@ -449,11 +467,11 @@ function ProgressSheet({
         {rows.map((r) => (
           <div
             key={r.groupId}
-            className="prog-row"
+            className={`prog-row${r.custom ? ' is-extra' : ''}`}
             style={{ '--row-tone': `var(--${r.tone})` } as React.CSSProperties}
           >
-            <span className="prog-icon">
-              <TrainingIcon groupId={r.groupId} />
+            <span className={`prog-icon${r.custom ? ' prog-extra-icon' : ''}`}>
+              {r.custom ? '＋' : <TrainingIcon groupId={r.groupId} />}
             </span>
             <span className="prog-name">{r.name}</span>
             <div className="prog-track">
@@ -468,29 +486,19 @@ function ProgressSheet({
             <span className="prog-num">
               {r.done}/{r.target}
             </span>
-          </div>
-        ))}
-        {extras.map((extra) => (
-          <div
-            key={extra.id}
-            className="prog-row is-extra"
-            style={{ '--row-tone': 'var(--teal)' } as React.CSSProperties}
-          >
-            <span className="prog-icon prog-extra-icon" aria-hidden>
-              ＋
-            </span>
-            <span className="prog-name">{extra.name}</span>
-            <div className="prog-track">
-              <div className="prog-fill" style={{ width: '100%', background: 'var(--teal)' }} />
-            </div>
-            <span className="prog-num">1/1</span>
-            <button
-              className="prog-remove"
-              onClick={() => onRemove(extra.id)}
-              aria-label={`刪除額外訓練 ${extra.name}`}
-            >
-              ×
-            </button>
+            {r.custom && (
+              <button
+                className="prog-remove"
+                onClick={() => {
+                  if (window.confirm(`刪除「${r.name}」？本週課表上的同名方塊也會一起移除。`)) {
+                    onRemove(r.groupId)
+                  }
+                }}
+                aria-label={`刪除自訂訓練 ${r.name}`}
+              >
+                ×
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -536,16 +544,18 @@ function TemplateSheet({
 }
 
 function PickerSheet({
+  groups,
   onClose,
   onPick,
 }: {
+  groups: readonly MuscleGroup[]
   onClose: () => void
   onPick: (groupId: string) => void
 }) {
   return (
     <Sheet title="加入訓練" onClose={onClose}>
       <div className="pick-grid">
-        {CATALOG.map((g) => (
+        {groups.map((g) => (
           <button
             key={g.id}
             className="pick-tile"

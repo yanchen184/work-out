@@ -14,6 +14,7 @@ import {
   placeDetachedGroup,
   removeFromSlot,
   removeExtraActivity,
+  scheduleForTemplate,
   setSlotChecked,
   shiftWeekKey,
   startOfWeek,
@@ -279,9 +280,17 @@ describe('overallProgress — 整體完成率', () => {
     expect(done).toBe(total)
   })
 
-  it('新增的本週額外訓練視為完成一次', () => {
-    const plan = addExtraActivity(createWeekPlan('2026-W31', emptySchedule()), '長跑')
-    expect(overallProgress(plan)).toEqual({ done: 1, total: 1 })
+  it('自訂訓練排入後才增加總數，打勾後才算完成', () => {
+    const created = addExtraActivity(createWeekPlan('2026-W31', emptySchedule()), '長跑')
+    const customId = created.extraActivities![0].id
+    expect(overallProgress(created)).toEqual({ done: 0, total: 0 })
+
+    const scheduled = addToSlot(created, 6, 'morning', customId)
+    expect(overallProgress(scheduled)).toEqual({ done: 0, total: 1 })
+    expect(overallProgress(toggleCheck(scheduled, 6, 'morning', customId))).toEqual({
+      done: 1,
+      total: 1,
+    })
   })
 })
 
@@ -295,6 +304,32 @@ describe('本週額外訓練', () => {
 
     const removed = removeExtraActivity(added, added.extraActivities![0].id)
     expect(removed.extraActivities).toHaveLength(0)
+  })
+
+  it('自訂訓練會出現在部位進度，刪除時同步清掉課表與勾選', () => {
+    const created = addExtraActivity(createWeekPlan('2026-W31', defaultSchedule()), '長跑')
+    const customId = created.extraActivities![0].id
+    const scheduled = toggleCheck(addToSlot(created, 6, 'morning', customId), 6, 'morning', customId)
+
+    expect(weekProgress(scheduled).find((row) => row.groupId === customId)).toMatchObject({
+      name: '長跑',
+      planned: 1,
+      done: 1,
+      target: 1,
+      custom: true,
+    })
+
+    const removed = removeExtraActivity(scheduled, customId)
+    expect(removed.schedule[6].morning).not.toContain(customId)
+    expect(removed.checked).not.toContain(checkKey(6, 'morning', customId))
+  })
+
+  it('存成永久模板時會排除本週限定的自訂訓練', () => {
+    const created = addExtraActivity(createWeekPlan('2026-W31', defaultSchedule()), '長跑')
+    const customId = created.extraActivities![0].id
+    const scheduled = addToSlot(created, 6, 'morning', customId)
+
+    expect(scheduleForTemplate(scheduled)[6].morning).not.toContain(customId)
   })
 
   it('空白名稱不新增', () => {

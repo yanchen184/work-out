@@ -347,7 +347,7 @@ describe('App — 底部拉盤', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('部位進度可以新增本週額外完成的長跑，重開後仍保留', async () => {
+  it('部位進度建立長跑後，可從格子的＋排入、打勾，重開仍保留', async () => {
     const user = userEvent.setup()
     await renderApp()
 
@@ -357,31 +357,54 @@ describe('App — 底部拉盤', () => {
     await user.click(screen.getByRole('button', { name: '加入' }))
 
     const sheet = screen.getByRole('dialog', { name: '部位進度' })
-    expect(within(sheet).getByText('長跑')).toBeTruthy()
-    expect(within(sheet).getByText('1/1')).toBeTruthy()
+    const customRow = within(sheet).getByText('長跑').closest('.prog-row') as HTMLElement
+    expect(customRow).toBeTruthy()
+    expect(within(customRow).getByText('0/1')).toBeTruthy()
 
     await user.click(screen.getByLabelText('關閉'))
+    await user.click(within(cell(6, 'morning')).getByLabelText('加入訓練'))
+    await user.click(within(screen.getByRole('dialog', { name: '加入訓練' })).getByText('長跑'))
+    expect(tile(6, 'morning', '長跑')).not.toHaveClass('is-done')
+
+    await user.click(tile(6, 'morning', '長跑'))
+    expect(tile(6, 'morning', '長跑')).toHaveClass('is-done')
+
+    await user.click(screen.getByText('部位進度'))
+    const doneCustomRow = within(
+      screen.getByRole('dialog', { name: '部位進度' }),
+    ).getByText('長跑').closest('.prog-row') as HTMLElement
+    expect(within(doneCustomRow).getByText('1/1')).toBeTruthy()
+    await user.click(screen.getByLabelText('關閉'))
+
     cleanup()
     render(<App />)
     await screen.findByText('早上')
-    await user.click(screen.getByText('部位進度'))
-    expect(screen.getByRole('dialog', { name: '部位進度' })).toHaveTextContent('長跑')
+    expect(tile(6, 'morning', '長跑')).toHaveClass('is-done')
   })
 
-  it('額外訓練可以刪除，不影響固定進度項目', async () => {
+  it('自訂訓練可以確認後刪除，課表方塊一起清掉且不影響固定項目', async () => {
     const user = userEvent.setup()
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     await renderApp()
 
     await user.click(screen.getByText('部位進度'))
     await user.click(screen.getByLabelText('新增本週額外訓練'))
     await user.type(screen.getByLabelText('額外訓練名稱'), '長跑')
     await user.click(screen.getByRole('button', { name: '加入' }))
-    await user.click(screen.getByLabelText('刪除額外訓練 長跑'))
+    await user.click(screen.getByLabelText('關閉'))
+    await user.click(within(cell(6, 'morning')).getByLabelText('加入訓練'))
+    await user.click(within(screen.getByRole('dialog', { name: '加入訓練' })).getByText('長跑'))
+
+    await user.click(screen.getByText('部位進度'))
+    await user.click(screen.getByLabelText('刪除自訂訓練 長跑'))
 
     expect(screen.queryByText('長跑')).toBeNull()
+    expect(within(cell(6, 'morning')).queryByText('長跑')).toBeNull()
     expect(
       within(screen.getByRole('dialog', { name: '部位進度' })).getByText('二三頭'),
     ).toBeTruthy()
+    expect(confirm).toHaveBeenCalledOnce()
+    confirm.mockRestore()
   })
 
   it('每週模板拉盤可以把這週存成模板，之後的週沿用', async () => {

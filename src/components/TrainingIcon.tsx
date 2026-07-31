@@ -29,7 +29,8 @@ const ICONS: Readonly<Record<string, string>> = {
  * 名稱仍是主要資訊，圖片只幫助快速辨識，因此不重複朗讀。
  */
 export function TrainingIcon({ groupId }: { readonly groupId: string }) {
-  const src = ICONS[groupId]
+  // 自訂訓練沒有專屬產圖；先用跑者圖騰，仍以方塊上的使用者名稱為主資訊。
+  const src = ICONS[groupId] ?? (groupId.startsWith('extra-') ? hiit : undefined)
   if (!src) return null
 
   return (

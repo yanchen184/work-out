@@ -69,7 +69,7 @@ tr.no strong{color:#fbbf24}
   <div class="card">
     <div class="stat">
       <div><b>22/22</b><span>驗收條件通過</span></div>
-      <div><b>159</b><span>單元 + 元件測試</span></div>
+      <div><b>161</b><span>單元 + 元件測試</span></div>
       <div><b>51</b><span>瀏覽器實測項（版面 22 + PWA 本機 14 + PWA 線上 15）</span></div>
       <div><b>11</b><span>訓練部位配額</span></div>
     </div>
@@ -132,8 +132,8 @@ tr.no strong{color:#fbbf24}
     </tr>
     <tr class="ok">
       <td class="st">✅</td>
-      <td><strong>部位進度可加臨時訓練</strong><span class="spec">按 ＋ 輸入「長跑」等本週額外完成項目，新增為 1/1 並可個別刪除</span></td>
-      <td class="ev">真實瀏覽器完成輸入與新增；重開保留、刪除、整體進度、舊資料相容與跨裝置 LWW 均有回歸測試</td>
+      <td><strong>自訂訓練可建立、排入與刪除</strong><span class="spec">部位進度按 ＋ 建立長跑；主畫面格子的 ＋ 可排入，之後可打勾、拖曳、進補做</span></td>
+      <td class="ev">完整流程測試：建立 0/1 → 排入週日 → 打勾 1/1 → 重開保留；確認刪除會清課表／勾選／補做，永久模板排除</td>
     </tr>
     <tr class="ok">
       <td class="st">✅</td>
@@ -232,8 +232,9 @@ tr.no strong{color:#fbbf24}
         避免 Safari 接管手勢造成「拿得起來但丟不掉」。</li>
       <li><strong>預設模板一天一早一晚</strong> — 早上與晚上各一攤，不是全擠在早上。模板只是起點，隨時可改。</li>
       <li><strong>只打勾不記組數</strong> — 在健身房不想輸入數字；組數目標放在部位進度當參考。</li>
-      <li><strong>臨時訓練只屬於本週</strong> — 部位進度的 ＋ 可新增長跑等額外完成項目，
-        以 1/1 呈現並參與總進度，不污染每週固定模板。</li>
+      <li><strong>自訂訓練有完整生命週期</strong> — 部位進度的 ＋ 建立長跑後先是 0/1，
+        再從主畫面格子的 ＋ 排入；之後可打勾、拖曳、進補做與拉回。刪除前確認並清乾淨，
+        只屬於本週、不污染永久模板。</li>
       <li><strong>補做池只收「沒打勾」的正方形</strong> — 已經做過的換掉不算欠；補做方塊可直接拖回課表，
         放回後只移除該來源的一顆；同部位不同日期的補做彼此獨立。舊資料若同時留在原格與補做，
         載入時會自動清掉精確原格。</li>

@@ -10,6 +10,7 @@ import {
   placeDetachedGroup,
   removeFromSlot,
   removeExtraActivity,
+  scheduleForTemplate,
   setSlotChecked,
   shiftWeekKey,
   swapGroup,
@@ -327,8 +328,9 @@ export function useWorkout() {
     /** 把目前這週的排法存成模板 */
     saveCurrentAsTemplate: useCallback(() => {
       if (!plan || !uid) return
-      setTemplate(plan.schedule)
-      void saveTemplate(uid, plan.schedule)
+      const nextTemplate = scheduleForTemplate(plan)
+      setTemplate(nextTemplate)
+      void saveTemplate(uid, nextTemplate)
     }, [plan, uid]),
 
     /** 用模板覆蓋本週（保留已打的勾） */

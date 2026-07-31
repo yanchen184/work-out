@@ -424,7 +424,7 @@ export function dismissMakeup(
   }
 }
 
-/** 在本週進度記下一筆已完成的額外訓練，例如「長跑」。 */
+/** 建立一個本週可排入課表的自訂訓練，例如「長跑」。 */
 export function addExtraActivity(plan: WeekPlan, name: string): WeekPlan {
   const cleanName = name.trim().replace(/\s+/g, ' ').slice(0, 24)
   if (!cleanName) return plan
@@ -439,15 +439,49 @@ export function addExtraActivity(plan: WeekPlan, name: string): WeekPlan {
   }
 }
 
-/** 刪除一筆誤加的本週額外訓練。 */
+/** 刪除自訂訓練，並從本週課表、勾選與補做紀錄一併移除。 */
 export function removeExtraActivity(plan: WeekPlan, id: string): WeekPlan {
   const current = plan.extraActivities ?? []
   if (!current.some((item) => item.id === id)) return plan
+  let schedule = plan.schedule
+  let checked = [...plan.checked]
+  for (const day of [0, 1, 2, 3, 4, 5, 6] as DayIndex[]) {
+    for (const slot of ['morning', 'evening'] as SlotKey[]) {
+      schedule = replaceSlot(
+        schedule,
+        day,
+        slot,
+        schedule[day][slot].filter((groupId) => groupId !== id),
+      )
+      checked = checked.filter((key) => key !== checkKey(day, slot, id))
+    }
+  }
   return {
     ...plan,
+    schedule,
+    checked,
+    makeups: plan.makeups.filter((item) => item.groupId !== id),
     extraActivities: current.filter((item) => item.id !== id),
     updatedAt: nextUpdatedAt(plan),
   }
+}
+
+/** 儲存成永久模板時排除本週限定的自訂訓練，避免下週只剩無名稱的 id。 */
+export function scheduleForTemplate(plan: WeekPlan): Schedule {
+  const customIds = new Set((plan.extraActivities ?? []).map((item) => item.id))
+  if (customIds.size === 0) return plan.schedule
+  let schedule = plan.schedule
+  for (const day of [0, 1, 2, 3, 4, 5, 6] as DayIndex[]) {
+    for (const slot of ['morning', 'evening'] as SlotKey[]) {
+      schedule = replaceSlot(
+        schedule,
+        day,
+        slot,
+        schedule[day][slot].filter((groupId) => !customIds.has(groupId)),
+      )
+    }
+  }
+  return schedule
 }
 
 /** ---------- 進度計算 ---------- */
@@ -461,6 +495,7 @@ export interface GroupProgress {
   readonly tone: string
   readonly targetAmount: number
   readonly unit: string
+  readonly custom?: boolean
 }
 
 /**
@@ -484,7 +519,7 @@ export function weekProgress(plan: WeekPlan): readonly GroupProgress[] {
     }
   }
 
-  return CATALOG.map((g) => ({
+  const fixed = CATALOG.map((g) => ({
     groupId: g.id,
     name: g.name,
     done: doneCount.get(g.id) ?? 0,
@@ -494,6 +529,18 @@ export function weekProgress(plan: WeekPlan): readonly GroupProgress[] {
     targetAmount: g.targetAmount,
     unit: g.unit,
   }))
+  const custom = (plan.extraActivities ?? []).map((activity) => ({
+    groupId: activity.id,
+    name: activity.name,
+    done: doneCount.get(activity.id) ?? 0,
+    planned: plannedCount.get(activity.id) ?? 0,
+    target: 1,
+    tone: 'teal',
+    targetAmount: 0,
+    unit: 'sessions',
+    custom: true,
+  }))
+  return [...fixed, ...custom]
 }
 
 /** 本週整體完成率（已打勾格數 / 已排格數） */
@@ -508,9 +555,6 @@ export function overallProgress(plan: WeekPlan): { done: number; total: number }
       }
     }
   }
-  // 從進度面板新增的項目代表「本週已經額外做了」，所以分子分母各加一。
-  done += plan.extraActivities?.length ?? 0
-  total += plan.extraActivities?.length ?? 0
   return { done, total }
 }
 
