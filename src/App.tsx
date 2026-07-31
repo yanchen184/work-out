@@ -104,6 +104,7 @@ export default function App() {
   )
   const progressPercent =
     progressTarget === 0 ? 0 : Math.round((progressPlanned / progressTarget) * 100)
+  const visibleMakeups = plan.makeups.filter((makeup) => !makeup.dismissed)
   const held = drag.held
 
   return (
@@ -200,50 +201,47 @@ export default function App() {
         ))}
       </div>
 
-      {plan.makeups.filter((m) => !m.dismissed).length > 0 && (
-        <section className="makeup">
-          <h2 className="mk-title">本週補做</h2>
-          <div className="mk-list">
-            {plan.makeups
-              .filter((m) => !m.dismissed)
-              .map((m) => {
-                const group = resolveGroup(m.groupId)
-                if (!group) return null
-                return (
-                  <div
-                    key={`${m.groupId}-${m.fromDay}-${m.fromSlot}`}
-                    className="mk-item"
-                    data-group={m.groupId}
-                  >
-                    <Tile
-                      group={group}
-                      done={false}
-                      ghost={
-                        held?.groupId === m.groupId &&
-                        held.fromDay === m.fromDay &&
-                        held.fromSlot === m.fromSlot &&
-                        held.detached &&
-                        !held.displaced
-                      }
-                      onPointerDown={(e) =>
-                        drag.begin(e, m.groupId, m.fromDay, m.fromSlot, true)
-                      }
-                      onPointerMove={drag.maybeCancel}
-                      onPointerUp={drag.endPending}
-                    />
-                    <button
-                      className="mk-x"
-                      onClick={() => w.dismiss(m.groupId, m.fromDay, m.fromSlot)}
-                      aria-label={`不補做 ${group.name}`}
-                    >
-                      ×
-                    </button>
-                  </div>
-                )
-              })}
-          </div>
-        </section>
-      )}
+      <section className="makeup">
+        <h2 className="mk-title">本週補做</h2>
+        <div className="mk-list">
+          {visibleMakeups.length === 0 && <div className="mk-empty">目前沒有待補</div>}
+          {visibleMakeups.map((m) => {
+            const group = resolveGroup(m.groupId)
+            if (!group) return null
+            return (
+              <div
+                key={`${m.groupId}-${m.fromDay}-${m.fromSlot}`}
+                className="mk-item"
+                data-group={m.groupId}
+              >
+                <Tile
+                  group={group}
+                  done={false}
+                  ghost={
+                    held?.groupId === m.groupId &&
+                    held.fromDay === m.fromDay &&
+                    held.fromSlot === m.fromSlot &&
+                    held.detached &&
+                    !held.displaced
+                  }
+                  onPointerDown={(e) =>
+                    drag.begin(e, m.groupId, m.fromDay, m.fromSlot, true)
+                  }
+                  onPointerMove={drag.maybeCancel}
+                  onPointerUp={drag.endPending}
+                />
+                <button
+                  className="mk-x"
+                  onClick={() => w.dismiss(m.groupId, m.fromDay, m.fromSlot)}
+                  aria-label={`不補做 ${group.name}`}
+                >
+                  ×
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </section>
 
       <footer className="tabs">
         <button className="tab" onClick={() => setPanel('progress')}>

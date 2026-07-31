@@ -68,8 +68,8 @@ tr.no strong{color:#fbbf24}
 
   <div class="card">
     <div class="stat">
-      <div><b>24/24</b><span>驗收條件通過</span></div>
-      <div><b>162</b><span>單元 + 元件測試</span></div>
+      <div><b>25/25</b><span>驗收條件通過</span></div>
+      <div><b>163</b><span>單元 + 元件測試</span></div>
       <div><b>51</b><span>瀏覽器實測項（版面 22 + PWA 本機 14 + PWA 線上 15）</span></div>
       <div><b>11</b><span>訓練部位配額</span></div>
     </div>
@@ -134,6 +134,11 @@ tr.no strong{color:#fbbf24}
       <td class="st">✅</td>
       <td><strong>補做正方形可拖回課表</strong><span class="spec">本週補做使用同款訓練方塊；長按可拖回任一早／晚格，放回後補做項消失</span></td>
       <td class="ev">以部位＋原日期＋早晚辨識；回歸測試確認兩個二三頭只移除實際拖回的一顆，× 也只略過指定一顆</td>
+    </tr>
+    <tr class="ok">
+      <td class="st">✅</td>
+      <td><strong>補做區固定不跳動</strong><span class="spec">本週補做即使沒有項目也保留同樣高度，以淡色空狀態穩定整頁版面</span></td>
+      <td class="ev">390×844 與 320×844 真實畫面確認：七天、空補做區、底部兩按鈕全在一屏，頁面無捲動或橫向溢出</td>
     </tr>
     <tr class="ok">
       <td class="st">✅</td>
@@ -248,7 +253,7 @@ tr.no strong{color:#fbbf24}
         只屬於本週、不污染永久模板。</li>
       <li><strong>補做池只收「沒打勾」的正方形</strong> — 已經做過的換掉不算欠；補做方塊可直接拖回課表，
         放回後只移除該來源的一顆；同部位不同日期的補做彼此獨立。舊資料若同時留在原格與補做，
-        載入時會自動清掉精確原格。</li>
+        載入時會自動清掉精確原格。補做區永遠保留固定高度，空白時也不讓整頁上下跳。</li>
       <li><strong>PWA 而不是原生 app</strong> — 需求是「放到手機裡面」，PWA 一次搞定 iPhone 與電腦、
         不用 Xcode、不用上架、改完 push 就更新。離線之所以成立，是因為
         <code>localStorage</code> 本來就是 source of truth，雲端只是同步層。</li>

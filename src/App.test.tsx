@@ -97,7 +97,9 @@ describe('App — 拖放', () => {
     expect(within(cell(6, 'morning')).getByText('二三頭')).toBeTruthy()
     expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
     // 單純搬移不算欠，不進補做
-    expect(document.querySelector('.makeup')).toBeNull()
+    expect(
+      within(document.querySelector('.makeup') as HTMLElement).getByText('目前沒有待補'),
+    ).toBeTruthy()
   })
 
   it('打過勾的方塊被搬走，勾要跟著走', async () => {
@@ -148,11 +150,22 @@ describe('App — 拖放', () => {
     // 被頂出來的那顆仍浮在手上；還沒落地就不進補做池
     expect(document.querySelector('.tile.is-floating')).toBeTruthy()
     expect(screen.queryByLabelText('拖到這裡丟棄')).toBeNull()
-    expect(document.querySelector('.makeup')).toBeNull()
+    expect(
+      within(document.querySelector('.makeup') as HTMLElement).getByText('目前沒有待補'),
+    ).toBeTruthy()
   })
 })
 
 describe('App — 格線外移到補做', () => {
+  it('沒有待補項目時仍保留本週補做區塊，避免版面跳動', async () => {
+    await renderApp()
+
+    const makeup = document.querySelector('.makeup') as HTMLElement
+    expect(makeup).toBeTruthy()
+    expect(within(makeup).getByText('本週補做')).toBeTruthy()
+    expect(within(makeup).getByText('目前沒有待補')).toBeTruthy()
+  })
+
   it('從圖片位置按住也由整顆方塊接管拖曳', async () => {
     await renderApp()
 
@@ -274,7 +287,9 @@ describe('App — 格線外移到補做', () => {
     document.elementFromPoint = original
 
     expect(within(cell(6, 'morning')).getByText('二三頭')).toBeTruthy()
-    expect(document.querySelector('.makeup')).toBeNull()
+    expect(
+      within(document.querySelector('.makeup') as HTMLElement).getByText('目前沒有待補'),
+    ).toBeTruthy()
   })
 
   it('兩個二三頭補做只會移除實際拖回的那一顆', async () => {
@@ -334,7 +349,10 @@ describe('App — 格線外移到補做', () => {
     document.elementFromPoint = original
 
     expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
-    expect(document.querySelector('.makeup')).toBeNull()
+    const makeup = document.querySelector('.makeup') as HTMLElement
+    expect(makeup).toBeTruthy()
+    expect(within(makeup).getByText('目前沒有待補')).toBeTruthy()
+    expect(within(makeup).queryByText('二三頭')).toBeNull()
   })
 })
 
