@@ -96,30 +96,28 @@ export default function App() {
   const resolveGroup = (id: string) => groupById(id) ?? customById.get(id)
   const overall = overallProgress(plan)
   const percent = overall.total === 0 ? 0 : Math.round((overall.done / overall.total) * 100)
+  const progressRows = weekProgress(plan)
+  const progressTarget = progressRows.reduce((sum, row) => sum + row.target, 0)
+  const progressPlanned = progressRows.reduce(
+    (sum, row) => sum + Math.min(row.planned, row.target),
+    0,
+  )
+  const progressPercent =
+    progressTarget === 0 ? 0 : Math.round((progressPlanned / progressTarget) * 100)
   const held = drag.held
 
   return (
     <div className={`app${held ? ' is-dragging' : ''}`}>
-      <header className="hd">
-        <h1 className="hd-title">每週健身</h1>
-        <div className="hd-right">
-          {/* 只有真的讀寫過雲端才敢說同步；沒連上就誠實說存在本機 */}
-          <span className="hd-sync" title={w.cloudReady ? '資料已同步雲端' : '資料存在這台裝置'}>
-            {w.cloudReady ? (w.syncing ? '同步中' : '已同步雲端') : '存在這台裝置'}
-          </span>
-          <button className="icon-btn" onClick={w.logout} title="換人">
-            {w.uid}
-          </button>
-        </div>
-      </header>
-
-      <nav className="weeknav">
+      <nav className="weeknav" aria-label="週次與使用者">
         <button className="wk-arrow" onClick={w.goPrevWeek} aria-label="上一週">
           ‹
         </button>
         <button className="wk-label" onClick={w.goThisWeek}>
           <span className="wk-name">{w.isCurrentWeek ? '本週' : formatWeekRange(w.weekKey)}</span>
           <span className="wk-range">{formatWeekRange(w.weekKey)}</span>
+        </button>
+        <button className="wk-user" onClick={w.logout} title="換人">
+          {w.uid}
         </button>
         <button className="wk-arrow" onClick={w.goNextWeek} aria-label="下一週">
           ›
@@ -289,8 +287,8 @@ export default function App() {
 
       {panel === 'progress' && (
         <ProgressSheet
-          rows={weekProgress(plan)}
-          percent={percent}
+          rows={progressRows}
+          percent={progressPercent}
           onAdd={w.addExtra}
           onRemove={w.removeExtra}
           onClose={() => setPanel(null)}
@@ -478,13 +476,14 @@ function ProgressSheet({
               <div
                 className="prog-fill"
                 style={{
-                  width: r.target > 0 ? `${Math.min(100, (r.done / r.target) * 100)}%` : '0%',
+                  width:
+                    r.target > 0 ? `${Math.min(100, (r.planned / r.target) * 100)}%` : '0%',
                   background: `var(--${r.tone})`,
                 }}
               />
             </div>
             <span className="prog-num">
-              {r.done}/{r.target}
+              {r.planned}/{r.target}
             </span>
             {r.custom && (
               <button

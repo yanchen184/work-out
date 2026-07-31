@@ -15,7 +15,6 @@ beforeEach(() => {
 async function renderApp(user = 'bob') {
   localStorage.setItem('workout:user', user)
   render(<App />)
-  await screen.findByText('每週健身')
   // 載入中 → 有資料（格線出現代表課表已經載進來）
   await screen.findByText('早上')
 }
@@ -363,7 +362,8 @@ describe('App — 底部拉盤', () => {
     const sheet = await screen.findByRole('dialog', { name: '部位進度' })
     expect(sheet).toBeTruthy()
     // 拉盤上來時主畫面沒有被換掉
-    expect(screen.getByText('每週健身')).toBeTruthy()
+    expect(screen.getByRole('navigation', { name: '週次與使用者' })).toBeTruthy()
+    expect(screen.getByText('早上')).toBeTruthy()
 
     await user.click(screen.getByLabelText('關閉'))
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -387,6 +387,14 @@ describe('App — 底部拉盤', () => {
     await user.click(within(cell(6, 'morning')).getByLabelText('加入訓練'))
     await user.click(within(screen.getByRole('dialog', { name: '加入訓練' })).getByText('長跑'))
     expect(tile(6, 'morning', '長跑')).not.toHaveClass('is-done')
+
+    // 部位進度看的是「有沒有排進課表」，不用等打勾才算。
+    await user.click(screen.getByText('部位進度'))
+    const plannedCustomRow = within(
+      screen.getByRole('dialog', { name: '部位進度' }),
+    ).getByText('長跑').closest('.prog-row') as HTMLElement
+    expect(within(plannedCustomRow).getByText('1/1')).toBeTruthy()
+    await user.click(screen.getByLabelText('關閉'))
 
     await user.click(tile(6, 'morning', '長跑'))
     expect(tile(6, 'morning', '長跑')).toHaveClass('is-done')
@@ -500,14 +508,19 @@ describe('App — 週切換', () => {
   })
 })
 
-describe('App — 同步狀態', () => {
-  it('雲端沒真的連上時，不能謊稱已同步', async () => {
+describe('App — 精簡頂部', () => {
+  it('主畫面不顯示標題與同步文案，使用者放在本週右邊', async () => {
     await renderApp()
 
-    // 測試環境沒有 Firebase 設定 → 一定是本機模式。
-    // 這條擋的是「設定填了就說已同步」那種只看 handshake 的寫法。
-    expect(screen.getByText('存在這台裝置')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: '每週健身' })).toBeNull()
+    expect(screen.queryByText('存在這台裝置')).toBeNull()
     expect(screen.queryByText('已同步雲端')).toBeNull()
+
+    const weekNav = screen.getByRole('navigation', { name: '週次與使用者' })
+    const weekLabel = within(weekNav).getByText('本週').closest('button')
+    const userButton = within(weekNav).getByTitle('換人')
+    expect(weekLabel?.nextElementSibling).toBe(userButton)
+    expect(userButton).toHaveTextContent('bob')
   })
 })
 
