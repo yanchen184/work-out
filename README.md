@@ -61,6 +61,10 @@ Service worker（Workbox）只預快取 JS/CSS/HTML，Firestore 一律走網路�
 那筆是靠「這台裝置下次開啟」補送的——關頁當下沒網路，物理上送不出去。
 這台永遠不再開的話，改動就只留在這台本機。這是離線優先架構的固有限制。
 
+在線時使用 Firestore `onSnapshot` 即時訂閱：兩個分頁、手機與電腦只要選同一帳號，
+一邊打勾後另一邊會直接更新，不需要重新整理。雲端初次讀取返回前發生的本機改動，
+也會在回應抵達時重新讀取最新本機版本，不會被較舊的讀取結果蓋掉。
+
 兩台同時離線、各打各的勾時，上雲一律是 **read-merge-write**：先讀回雲端現況再合併，
 `checked` 取聯集，兩台的勾都留著。之前是整份 last-write-wins，後同步的那台會把先同步的
 整份蓋掉——實測重現過，勾就這樣消失。代價是「取消打勾」可能被另一台的舊資料復活；
@@ -102,7 +106,7 @@ gzip 204.8 KB 降到 68.6 KB（少 66%）。
 nvm use          # 讀 .nvmrc
 npm install
 npm run dev      # http://localhost:5173
-npm test         # 138 個測試
+npm test         # 140 個測試
 npm run build
 ```
 
@@ -155,7 +159,7 @@ src/
 
 ## 測試
 
-138 個測試：
+140 個測試：
 
 - `domain/week.test.ts` — 週次邊界（跨年 ISO 週）、打勾、替換的補做池規則、進度計算
 - `lib/syncQueue.test.ts` — 佇列去重、送達才移除、送出期間又改動、部分失敗、併發 flush

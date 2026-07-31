@@ -18,6 +18,24 @@ const cloud = new Map<string, unknown>()
 let failNextSet = 0
 let failNextGet = 0
 let setCalls: Array<{ path: string; data: unknown }> = []
+let releaseGet: (() => void) | null = null
+let getGate: Promise<void> | null = null
+const snapshotListeners = new Map<
+  string,
+  Set<(snap: { exists: () => boolean; data: () => unknown }) => void>
+>()
+
+function snapshot(path: string) {
+  const data = cloud.get(path)
+  return {
+    exists: () => data !== undefined,
+    data: () => data,
+  }
+}
+
+function emitSnapshot(path: string): void {
+  for (const listener of snapshotListeners.get(path) ?? []) listener(snapshot(path))
+}
 
 vi.mock('./firebase', () => ({
   firebaseEnabled: true,
@@ -30,15 +48,12 @@ vi.mock('firebase/firestore', () => ({
   // doc(db, 'users', uid, 'weeks', key) → 直接把路徑接成字串當 key
   doc: (_db: unknown, ...segments: string[]) => ({ path: segments.join('/') }),
   getDoc: async (ref: { path: string }) => {
+    if (getGate) await getGate
     if (failNextGet > 0) {
       failNextGet -= 1
       throw new Error('offline')
     }
-    const data = cloud.get(ref.path)
-    return {
-      exists: () => data !== undefined,
-      data: () => data,
-    }
+    return snapshot(ref.path)
   },
   setDoc: async (ref: { path: string }, data: unknown) => {
     if (failNextSet > 0) {
@@ -47,10 +62,22 @@ vi.mock('firebase/firestore', () => ({
     }
     setCalls.push({ path: ref.path, data })
     cloud.set(ref.path, JSON.parse(JSON.stringify(data)))
+    emitSnapshot(ref.path)
+  },
+  onSnapshot: (
+    ref: { path: string },
+    next: (snap: { exists: () => boolean; data: () => unknown }) => void,
+  ) => {
+    const listeners = snapshotListeners.get(ref.path) ?? new Set()
+    listeners.add(next)
+    snapshotListeners.set(ref.path, listeners)
+    next(snapshot(ref.path))
+    return () => listeners.delete(next)
   },
 }))
 
-const { flushPending, isCloudOk, loadWeek, pendingCount, saveWeek } = await import('./store')
+const { flushPending, isCloudOk, loadWeek, pendingCount, saveWeek, subscribeWeek } =
+  await import('./store')
 const { clearQueue } = await import('./syncQueue')
 
 const WEEK = '2026-W31'
@@ -64,6 +91,9 @@ beforeEach(() => {
   failNextSet = 0
   failNextGet = 0
   setCalls = []
+  releaseGet = null
+  getGate = null
+  snapshotListeners.clear()
 })
 
 describe('saveWeek — 雲端寫入失敗', () => {
@@ -159,6 +189,27 @@ describe('saveWeek — 即時寫入也要合併', () => {
 })
 
 describe('loadWeek — 雲端讀取', () => {
+  it('雲端讀取途中打勾，回應抵達後不會用舊本機資料蓋掉', async () => {
+    localStorage.setItem(`workout:bob:week:${WEEK}`, JSON.stringify(base()))
+    cloud.set(PATH, JSON.parse(JSON.stringify(base())))
+    getGate = new Promise<void>((resolve) => {
+      releaseGet = resolve
+    })
+
+    const loading = loadWeek('bob', WEEK, defaultSchedule())
+    await Promise.resolve()
+
+    const checkedWhileLoading = toggleCheck(base(), 0, 'morning', 'arms')
+    localStorage.setItem(
+      `workout:bob:week:${WEEK}`,
+      JSON.stringify(checkedWhileLoading),
+    )
+    releaseGet?.()
+
+    const loaded = await loading
+    expect(loaded.checked).toContain(checkKey(0, 'morning', 'arms'))
+  })
+
   it('雲端讀失敗 → 退回本機資料，不是空白畫面', async () => {
     const plan = toggleCheck(base(), 0, 'morning', 'arms')
     localStorage.setItem(`workout:bob:week:${WEEK}`, JSON.stringify(plan))
@@ -212,5 +263,22 @@ describe('loadWeek — 雲端讀取', () => {
     localStorage.setItem(`workout:bob:week:${WEEK}`, '{ 壞掉的')
     const loaded = await loadWeek('bob', WEEK, defaultSchedule())
     expect(loaded.weekKey).toBe(WEEK)
+  })
+})
+
+describe('subscribeWeek — realtime 跨裝置同步', () => {
+  it('遠端文件變更會立即送給訂閱者，取消後不再送', async () => {
+    const received: WeekPlan[] = []
+    const stop = await subscribeWeek('bob', WEEK, (plan) => received.push(plan))
+
+    cloud.set(PATH, JSON.parse(JSON.stringify(toggleCheck(base(), 1, 'morning', 'hiit'))))
+    emitSnapshot(PATH)
+    expect(received.at(-1)?.checked).toContain(checkKey(1, 'morning', 'hiit'))
+
+    const countBeforeStop = received.length
+    stop()
+    cloud.set(PATH, JSON.parse(JSON.stringify(toggleCheck(base(), 0, 'morning', 'arms'))))
+    emitSnapshot(PATH)
+    expect(received).toHaveLength(countBeforeStop)
   })
 })

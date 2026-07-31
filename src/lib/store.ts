@@ -22,7 +22,13 @@ async function cloud() {
   if (!firebaseEnabled) return null
   const [db, fs] = await Promise.all([getDb(), import('firebase/firestore')])
   if (!db) return null
-  return { db, doc: fs.doc, getDoc: fs.getDoc, setDoc: fs.setDoc }
+  return {
+    db,
+    doc: fs.doc,
+    getDoc: fs.getDoc,
+    setDoc: fs.setDoc,
+    onSnapshot: fs.onSnapshot,
+  }
 }
 
 function localWeekKey(uid: string, weekKey: string): string {
@@ -155,7 +161,8 @@ export async function loadWeek(
   weekKey: string,
   fallbackSchedule: Schedule,
 ): Promise<WeekPlan> {
-  const local = readLocal(localWeekKey(uid, weekKey), isWeekPlan)
+  const key = localWeekKey(uid, weekKey)
+  const initialLocal = readLocal(key, isWeekPlan)
 
   const c = await cloud()
   if (c) {
@@ -167,14 +174,20 @@ export async function loadWeek(
         if (!isWeekPlan(remote)) {
           console.warn('雲端週計畫格式不正確，改用本機資料')
         } else {
+          /*
+           * Firestore 往返期間使用者仍可打勾。不能拿函式剛開始時讀到的
+           * initialLocal 合併，否則較晚的本機打勾會被這次舊讀取覆蓋。
+           * 回應抵達時重讀一次 localStorage，才是真正的最新本機狀態。
+           */
+          const latestLocal = readLocal(key, isWeekPlan) ?? initialLocal
           /**
            * 合併，不是二選一。兩台裝置各自離線打不同的勾時，單純取較新的那份
            * 會把另一台的勾整份蓋掉（實測過，勾就這樣消失）。見 mergeWeekPlans。
            */
-          const merged = local ? mergeWeekPlans(local, remote) : remote
-          writeLocal(localWeekKey(uid, weekKey), merged)
+          const merged = latestLocal ? mergeWeekPlans(latestLocal, remote) : remote
+          writeLocal(key, merged)
           // 合併後跟雲端不一樣 = 本機有雲端沒有的勾，推回去補上
-          if (local && merged.checked.length !== remote.checked.length) {
+          if (latestLocal && merged.checked.length !== remote.checked.length) {
             void saveWeek(uid, merged)
           }
           return merged
@@ -186,9 +199,44 @@ export async function loadWeek(
     }
   }
 
-  if (local) return local
+  const latestLocal = readLocal(key, isWeekPlan) ?? initialLocal
+  if (latestLocal) return latestLocal
   // 這週還沒開始 → 用模板生成一份新的
   return createWeekPlan(weekKey, fallbackSchedule)
+}
+
+/**
+ * 訂閱同一帳號、同一週的 Firestore 文件。
+ *
+ * getDoc 只會在開頁時讀一次；跨分頁／跨手機要做到真正 realtime，必須靠
+ * onSnapshot。這裡只負責驗證並送出遠端資料，如何跟目前畫面合併由 hook 決定。
+ */
+export async function subscribeWeek(
+  uid: string,
+  weekKey: string,
+  onPlan: (plan: WeekPlan) => void,
+): Promise<() => void> {
+  const c = await cloud()
+  if (!c) return () => undefined
+
+  const ref = c.doc(c.db, 'users', uid, 'weeks', weekKey)
+  return c.onSnapshot(
+    ref,
+    (snap) => {
+      setCloudOk(true)
+      if (!snap.exists()) return
+      const remote: unknown = snap.data()
+      if (!isWeekPlan(remote)) {
+        console.warn('雲端週計畫格式不正確，略過 realtime 更新')
+        return
+      }
+      onPlan(remote)
+    },
+    (error) => {
+      setCloudOk(false)
+      console.warn('監聽雲端週計畫失敗', error)
+    },
+  )
 }
 
 /**

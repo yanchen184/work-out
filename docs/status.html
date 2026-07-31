@@ -69,7 +69,7 @@ tr.no strong{color:#fbbf24}
   <div class="card">
     <div class="stat">
       <div><b>20/20</b><span>驗收條件通過</span></div>
-      <div><b>138</b><span>單元 + 元件測試</span></div>
+      <div><b>140</b><span>單元 + 元件測試</span></div>
       <div><b>51</b><span>瀏覽器實測項（版面 22 + PWA 本機 14 + PWA 線上 15）</span></div>
       <div><b>11</b><span>訓練部位配額</span></div>
     </div>
@@ -188,8 +188,8 @@ tr.no strong{color:#fbbf24}
     </tr>
     <tr class="ok">
       <td class="st">✅</td>
-      <td><strong>雲端同步（跨裝置）</strong><span class="spec">手機與電腦開同一網址看到同一份資料</span></td>
-      <td class="ev">兩個獨立瀏覽器 context 雙向實測：A 打勾 → B 讀到；B 改動 → 新裝置 C 讀到</td>
+      <td><strong>Realtime 雲端同步</strong><span class="spec">同帳號的兩個分頁／手機與電腦，不刷新也會立即看到打勾</span></td>
+      <td class="ev">2026-07-31 補上 Firestore onSnapshot；自動測試鎖住即時推送與「雲端讀取途中打勾不被舊回應覆蓋」</td>
     </tr>
     <tr class="ok">
       <td class="st">✅</td>

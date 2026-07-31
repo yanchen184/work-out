@@ -5,6 +5,7 @@ import {
   dismissMakeup,
   dropToMakeup,
   moveGroup,
+  mergeWeekPlans,
   removeFromSlot,
   setSlotChecked,
   shiftWeekKey,
@@ -31,6 +32,7 @@ import {
   saveTemplate,
   saveWeek,
   saveWeekLocal,
+  subscribeWeek,
   watchCloud,
 } from './store'
 
@@ -114,6 +116,36 @@ export function useWorkout() {
       cancelled = true
     }
   }, [uid, weekKey, template])
+
+  /**
+   * Firestore realtime：另一個分頁或另一支手機一寫入，本頁立即合併顯示。
+   * 訂閱回來的資料也落進 localStorage，重新整理不會退回舊畫面。
+   */
+  useEffect(() => {
+    if (!uid || !firebaseEnabled) return
+    let cancelled = false
+    let unsubscribe: () => void = () => undefined
+
+    void subscribeWeek(uid, weekKey, (remote) => {
+      if (cancelled) return
+      setPlan((current) => {
+        const local = loadWeekLocal(uid, weekKey)
+        const base = current?.weekKey === weekKey ? current : local
+        const merged = base ? mergeWeekPlans(base, remote) : remote
+        saveWeekLocal(uid, merged)
+        return merged
+      })
+      setLoading(false)
+    }).then((stop) => {
+      if (cancelled) stop()
+      else unsubscribe = stop
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [uid, weekKey])
 
   /**
    * 改動後存檔：本機立刻寫，雲端 debounce。
