@@ -11,7 +11,15 @@
  * 手寫而不是引 zod：schema 很小又封閉，而且 bundle 大小是這個專案在意的事。
  */
 
-import type { DayIndex, MakeupItem, Schedule, SlotKey, Template, WeekPlan } from '../domain/types'
+import type {
+  DayIndex,
+  ExtraActivity,
+  MakeupItem,
+  Schedule,
+  SlotKey,
+  Template,
+  WeekPlan,
+} from '../domain/types'
 
 const DAYS: readonly DayIndex[] = [0, 1, 2, 3, 4, 5, 6]
 const SLOTS: readonly SlotKey[] = ['morning', 'evening']
@@ -46,6 +54,16 @@ function isMakeupItem(value: unknown): value is MakeupItem {
   )
 }
 
+function isExtraActivity(value: unknown): value is ExtraActivity {
+  return (
+    isObject(value) &&
+    typeof value.id === 'string' &&
+    value.id.length > 0 &&
+    typeof value.name === 'string' &&
+    value.name.trim().length > 0
+  )
+}
+
 export function isWeekPlan(value: unknown): value is WeekPlan {
   if (!isObject(value)) return false
   return (
@@ -55,6 +73,9 @@ export function isWeekPlan(value: unknown): value is WeekPlan {
     isStringArray(value.checked) &&
     Array.isArray(value.makeups) &&
     value.makeups.every(isMakeupItem) &&
+    (value.extraActivities === undefined ||
+      (Array.isArray(value.extraActivities) &&
+        value.extraActivities.every(isExtraActivity))) &&
     typeof value.updatedAt === 'number' &&
     Number.isFinite(value.updatedAt)
   )

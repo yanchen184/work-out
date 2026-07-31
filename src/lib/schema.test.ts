@@ -79,6 +79,24 @@ describe('isWeekPlan', () => {
     expect(isWeekPlan(ok)).toBe(true)
   })
 
+  it('舊資料沒有 extraActivities 仍合法，新資料會驗證每一筆', () => {
+    const legacy = { ...WEEK } as Record<string, unknown>
+    delete legacy.extraActivities
+    expect(isWeekPlan(legacy)).toBe(true)
+    expect(
+      isWeekPlan({
+        ...WEEK,
+        extraActivities: [{ id: 'extra-1', name: '長跑' }],
+      }),
+    ).toBe(true)
+    expect(
+      isWeekPlan({
+        ...WEEK,
+        extraActivities: [{ id: '', name: '長跑' }],
+      }),
+    ).toBe(false)
+  })
+
   it('updatedAt 不是有限數字就不合格', () => {
     expect(isWeekPlan({ ...WEEK, updatedAt: 'now' })).toBe(false)
     expect(isWeekPlan({ ...WEEK, updatedAt: NaN })).toBe(false)

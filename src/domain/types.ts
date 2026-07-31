@@ -55,6 +55,12 @@ export interface MakeupItem {
   readonly dismissed: boolean
 }
 
+/** 使用者在「部位進度」臨時記下的本週額外訓練。 */
+export interface ExtraActivity {
+  readonly id: string
+  readonly name: string
+}
+
 /** 某一週的完整狀態 */
 export interface WeekPlan {
   /** ISO 週次 key，例：2026-W31 */
@@ -65,6 +71,8 @@ export interface WeekPlan {
   readonly checked: readonly CheckKey[]
   /** 因替換而欠下的補做項目 */
   readonly makeups: readonly MakeupItem[]
+  /** 不屬於固定模板、但這週額外完成的訓練（舊資料可沒有此欄位）。 */
+  readonly extraActivities?: readonly ExtraActivity[]
   readonly updatedAt: number
 }
 

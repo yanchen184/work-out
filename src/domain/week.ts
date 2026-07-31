@@ -60,7 +60,14 @@ export function formatWeekRange(key: string): string {
 }
 
 export function createWeekPlan(weekKey: string, schedule: Schedule): WeekPlan {
-  return { weekKey, schedule, checked: [], makeups: [], updatedAt: Date.now() }
+  return {
+    weekKey,
+    schedule,
+    checked: [],
+    makeups: [],
+    extraActivities: [],
+    updatedAt: Date.now(),
+  }
 }
 
 /**
@@ -417,6 +424,32 @@ export function dismissMakeup(
   }
 }
 
+/** 在本週進度記下一筆已完成的額外訓練，例如「長跑」。 */
+export function addExtraActivity(plan: WeekPlan, name: string): WeekPlan {
+  const cleanName = name.trim().replace(/\s+/g, ' ').slice(0, 24)
+  if (!cleanName) return plan
+  const updatedAt = nextUpdatedAt(plan)
+  return {
+    ...plan,
+    extraActivities: [
+      ...(plan.extraActivities ?? []),
+      { id: `extra-${updatedAt}`, name: cleanName },
+    ],
+    updatedAt,
+  }
+}
+
+/** 刪除一筆誤加的本週額外訓練。 */
+export function removeExtraActivity(plan: WeekPlan, id: string): WeekPlan {
+  const current = plan.extraActivities ?? []
+  if (!current.some((item) => item.id === id)) return plan
+  return {
+    ...plan,
+    extraActivities: current.filter((item) => item.id !== id),
+    updatedAt: nextUpdatedAt(plan),
+  }
+}
+
 /** ---------- 進度計算 ---------- */
 
 export interface GroupProgress {
@@ -475,6 +508,9 @@ export function overallProgress(plan: WeekPlan): { done: number; total: number }
       }
     }
   }
+  // 從進度面板新增的項目代表「本週已經額外做了」，所以分子分母各加一。
+  done += plan.extraActivities?.length ?? 0
+  total += plan.extraActivities?.length ?? 0
   return { done, total }
 }
 

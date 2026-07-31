@@ -146,14 +146,14 @@ describe('App — 拖放', () => {
 
     // 二三頭 進到週二早上
     expect(within(cell(1, 'morning')).getByText('二三頭')).toBeTruthy()
-    // 被頂出來的那顆仍浮在手上，垃圾桶也會保持可用，還沒落地就不進補做池
+    // 被頂出來的那顆仍浮在手上；還沒落地就不進補做池
     expect(document.querySelector('.tile.is-floating')).toBeTruthy()
-    expect(screen.getByLabelText('拖到這裡丟棄')).toBeTruthy()
+    expect(screen.queryByLabelText('拖到這裡丟棄')).toBeNull()
     expect(document.querySelector('.makeup')).toBeNull()
   })
 })
 
-describe('App — 格線外與垃圾桶都移到補做', () => {
+describe('App — 格線外移到補做', () => {
   it('按下時 capture 同一支手指，滑出原方塊後仍收得到放手', async () => {
     await renderApp()
 
@@ -166,12 +166,12 @@ describe('App — 格線外與垃圾桶都移到補做', () => {
     expect(capture).toHaveBeenCalledWith(7)
   })
 
-  it('往底部中央滑時顯示垃圾桶吸附，放手後原格消失並進補做', async () => {
+  it('往底部中央滑也不顯示垃圾桶，放手仍算格線外並進補做', async () => {
     await renderApp()
 
     const source = tile(0, 'morning', '二三頭')
     const original = document.elementFromPoint
-    document.elementFromPoint = () => document.querySelector('.trash-drop')
+    document.elementFromPoint = () => null
 
     fireEvent.pointerDown(source, { pointerId: 7, clientX: 10, clientY: 10 })
     await act(async () => {
@@ -183,9 +183,8 @@ describe('App — 格線外與垃圾桶都移到補做', () => {
       clientY: window.innerHeight - 30,
     })
 
-    expect(screen.getByLabelText('拖到這裡丟棄')).toHaveClass('is-active')
-    expect(document.querySelector('.tile.is-floating')).toHaveClass('is-absorbed')
-    expect(screen.getByText('放手丟棄')).toBeTruthy()
+    expect(screen.queryByLabelText('拖到這裡丟棄')).toBeNull()
+    expect(document.querySelector('.tile.is-floating')).not.toHaveClass('is-absorbed')
 
     await act(async () => {
       fireEvent.pointerUp(window, {
@@ -197,7 +196,6 @@ describe('App — 格線外與垃圾桶都移到補做', () => {
     document.elementFromPoint = original
 
     expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
-    expect(screen.queryByLabelText('拖到這裡丟棄')).toBeNull()
     const makeup = document.querySelector('.makeup') as HTMLElement
     expect(makeup).toBeTruthy()
     expect(within(makeup).getByText('二三頭')).toBeTruthy()
@@ -347,6 +345,43 @@ describe('App — 底部拉盤', () => {
 
     await user.click(screen.getByLabelText('關閉'))
     expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('部位進度可以新增本週額外完成的長跑，重開後仍保留', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    await user.click(screen.getByText('部位進度'))
+    await user.click(screen.getByLabelText('新增本週額外訓練'))
+    await user.type(screen.getByLabelText('額外訓練名稱'), '長跑')
+    await user.click(screen.getByRole('button', { name: '加入' }))
+
+    const sheet = screen.getByRole('dialog', { name: '部位進度' })
+    expect(within(sheet).getByText('長跑')).toBeTruthy()
+    expect(within(sheet).getByText('1/1')).toBeTruthy()
+
+    await user.click(screen.getByLabelText('關閉'))
+    cleanup()
+    render(<App />)
+    await screen.findByText('早上')
+    await user.click(screen.getByText('部位進度'))
+    expect(screen.getByRole('dialog', { name: '部位進度' })).toHaveTextContent('長跑')
+  })
+
+  it('額外訓練可以刪除，不影響固定進度項目', async () => {
+    const user = userEvent.setup()
+    await renderApp()
+
+    await user.click(screen.getByText('部位進度'))
+    await user.click(screen.getByLabelText('新增本週額外訓練'))
+    await user.type(screen.getByLabelText('額外訓練名稱'), '長跑')
+    await user.click(screen.getByRole('button', { name: '加入' }))
+    await user.click(screen.getByLabelText('刪除額外訓練 長跑'))
+
+    expect(screen.queryByText('長跑')).toBeNull()
+    expect(
+      within(screen.getByRole('dialog', { name: '部位進度' })).getByText('二三頭'),
+    ).toBeTruthy()
   })
 
   it('每週模板拉盤可以把這週存成模板，之後的週沿用', async () => {

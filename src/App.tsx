@@ -3,7 +3,7 @@ import './App.css'
 import { useWorkout } from './lib/useWorkout'
 import { CATALOG, DAY_LABELS, groupById } from './domain/catalog'
 import { formatWeekRange, overallProgress, weekProgress } from './domain/week'
-import { checkKey, type DayIndex, type SlotKey } from './domain/types'
+import { checkKey, type DayIndex, type ExtraActivity, type SlotKey } from './domain/types'
 import { USERS } from './lib/firebase'
 import { Tile } from './components/Tile'
 import { TrainingIcon } from './components/TrainingIcon'
@@ -248,7 +248,6 @@ export default function App() {
               group={group}
               done={false}
               floating
-              absorbed={drag.trashActive}
               style={{
                 left: held.x - held.dx,
                 top: held.y - held.dy,
@@ -256,18 +255,6 @@ export default function App() {
             />
           )
         })()}
-
-      {held && (
-        <div
-          className={`trash-drop${drag.trashActive ? ' is-active' : ''}`}
-          aria-label="拖到這裡丟棄"
-        >
-          <span className="trash-icon"><UiIcon name="trash" /></span>
-          <span className="trash-label">
-            {drag.trashActive ? '放手丟棄' : '拖到這裡刪除'}
-          </span>
-        </div>
-      )}
 
       {picker && (
         <PickerSheet
@@ -282,7 +269,10 @@ export default function App() {
       {panel === 'progress' && (
         <ProgressSheet
           rows={weekProgress(plan)}
+          extras={plan.extraActivities ?? []}
           percent={percent}
+          onAdd={w.addExtra}
+          onRemove={w.removeExtra}
           onClose={() => setPanel(null)}
         />
       )}
@@ -394,25 +384,68 @@ function Sheet({
 
 function ProgressSheet({
   rows,
+  extras,
   percent,
+  onAdd,
+  onRemove,
   onClose,
 }: {
   rows: ReturnType<typeof weekProgress>
+  extras: readonly ExtraActivity[]
   percent: number
+  onAdd: (name: string) => void
+  onRemove: (id: string) => void
   onClose: () => void
 }) {
+  const [adding, setAdding] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const name = draft.trim()
+    if (!name) return
+    onAdd(name)
+    setDraft('')
+    setAdding(false)
+  }
+
   return (
     <Sheet
       title="部位進度"
       titleIcon={<UiIcon name="progress" />}
       titleAside={
-        <span className="sheet-summary">
-          本週總進度 <strong>{percent}%</strong>
-        </span>
+        <div className="prog-heading-actions">
+          <span className="sheet-summary">
+            本週總進度 <strong>{percent}%</strong>
+          </span>
+          <button
+            className="prog-plus"
+            onClick={() => setAdding((value) => !value)}
+            aria-label="新增本週額外訓練"
+            aria-expanded={adding}
+          >
+            ＋
+          </button>
+        </div>
       }
       onClose={onClose}
     >
       <div className="prog">
+        {adding && (
+          <form className="prog-add-form" onSubmit={submit}>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              maxLength={24}
+              placeholder="例如：長跑"
+              aria-label="額外訓練名稱"
+              autoFocus
+            />
+            <button type="submit" disabled={!draft.trim()}>
+              加入
+            </button>
+          </form>
+        )}
         {rows.map((r) => (
           <div
             key={r.groupId}
@@ -435,6 +468,29 @@ function ProgressSheet({
             <span className="prog-num">
               {r.done}/{r.target}
             </span>
+          </div>
+        ))}
+        {extras.map((extra) => (
+          <div
+            key={extra.id}
+            className="prog-row is-extra"
+            style={{ '--row-tone': 'var(--teal)' } as React.CSSProperties}
+          >
+            <span className="prog-icon prog-extra-icon" aria-hidden>
+              ＋
+            </span>
+            <span className="prog-name">{extra.name}</span>
+            <div className="prog-track">
+              <div className="prog-fill" style={{ width: '100%', background: 'var(--teal)' }} />
+            </div>
+            <span className="prog-num">1/1</span>
+            <button
+              className="prog-remove"
+              onClick={() => onRemove(extra.id)}
+              aria-label={`刪除額外訓練 ${extra.name}`}
+            >
+              ×
+            </button>
           </div>
         ))}
       </div>

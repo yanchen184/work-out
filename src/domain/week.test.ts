@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addExtraActivity,
   addToSlot,
   createWeekPlan,
   dismissMakeup,
@@ -12,6 +13,7 @@ import {
   overallProgress,
   placeDetachedGroup,
   removeFromSlot,
+  removeExtraActivity,
   setSlotChecked,
   shiftWeekKey,
   startOfWeek,
@@ -275,6 +277,29 @@ describe('overallProgress — 整體完成率', () => {
     }
     const { done, total } = overallProgress(plan)
     expect(done).toBe(total)
+  })
+
+  it('新增的本週額外訓練視為完成一次', () => {
+    const plan = addExtraActivity(createWeekPlan('2026-W31', emptySchedule()), '長跑')
+    expect(overallProgress(plan)).toEqual({ done: 1, total: 1 })
+  })
+})
+
+describe('本週額外訓練', () => {
+  it('會整理名稱空白、保存為獨立項目，且可以刪除', () => {
+    const plan = createWeekPlan('2026-W31', defaultSchedule())
+    const added = addExtraActivity(plan, '  長   跑  ')
+
+    expect(added.extraActivities).toHaveLength(1)
+    expect(added.extraActivities?.[0].name).toBe('長 跑')
+
+    const removed = removeExtraActivity(added, added.extraActivities![0].id)
+    expect(removed.extraActivities).toHaveLength(0)
+  })
+
+  it('空白名稱不新增', () => {
+    const plan = createWeekPlan('2026-W31', defaultSchedule())
+    expect(addExtraActivity(plan, '   ')).toBe(plan)
   })
 })
 
@@ -604,5 +629,17 @@ describe('mergeWeekPlans — 兩台裝置各自離線打勾', () => {
     mergeWeekPlans(a, b)
     expect(a.checked).toEqual(aBefore)
     expect(b.checked).toEqual(bBefore)
+  })
+
+  it('本週額外訓練跟著較新的完整週計畫同步', () => {
+    const older = { ...base, updatedAt: 1000 }
+    const newer = {
+      ...addExtraActivity(base, '長跑'),
+      updatedAt: 2000,
+    }
+
+    expect(mergeWeekPlans(older, newer).extraActivities?.map((item) => item.name)).toEqual([
+      '長跑',
+    ])
   })
 })

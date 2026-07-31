@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DayIndex, Schedule, SlotKey, WeekPlan } from '../domain/types'
 import {
+  addExtraActivity,
   addToSlot,
   dismissMakeup,
   dropToMakeup,
@@ -8,6 +9,7 @@ import {
   mergeWeekPlans,
   placeDetachedGroup,
   removeFromSlot,
+  removeExtraActivity,
   setSlotChecked,
   shiftWeekKey,
   swapGroup,
@@ -254,6 +256,21 @@ export function useWorkout() {
     dismiss: useCallback(
       (groupId: string, fromDay: DayIndex, fromSlot: SlotKey) => {
         if (plan) persist(dismissMakeup(plan, groupId, fromDay, fromSlot))
+      },
+      [plan, persist],
+    ),
+
+    /** 記錄／移除本週臨時多做的訓練。 */
+    addExtra: useCallback(
+      (name: string) => {
+        if (plan) persist(addExtraActivity(plan, name))
+      },
+      [plan, persist],
+    ),
+
+    removeExtra: useCallback(
+      (id: string) => {
+        if (plan) persist(removeExtraActivity(plan, id))
       },
       [plan, persist],
     ),

@@ -28,9 +28,6 @@ export interface DropZone {
 const HOLD_MS = 180
 /** 按住期間手指移動超過這距離就當成捲動，不算拿起 */
 const MOVE_TOLERANCE = 10
-/** 手指進到底部中央這塊範圍，方塊就吸到垃圾桶。 */
-const TRASH_WIDTH = 220
-const TRASH_HEIGHT = 150
 
 interface UseDragOptions {
   /** 放到某一格。回傳被頂出來的項目 id，沒有就 null */
@@ -46,7 +43,6 @@ interface UseDragOptions {
 export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
   const [held, setHeld] = useState<Held | null>(null)
   const [hoverZone, setHoverZone] = useState<DropZone | null>(null)
-  const [trashActive, setTrashActive] = useState(false)
 
   const holdTimer = useRef<number | undefined>(undefined)
   const pending = useRef<{ x: number; y: number } | null>(null)
@@ -77,13 +73,6 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
     const tile = el?.closest<HTMLElement>('[data-group]')
     return tile?.dataset.group
   }, [])
-
-  const isOverTrash = useCallback(
-    (x: number, y: number): boolean =>
-      y >= window.innerHeight - TRASH_HEIGHT &&
-      Math.abs(x - window.innerWidth / 2) <= TRASH_WIDTH / 2,
-    [],
-  )
 
   const begin = useCallback(
     (
@@ -145,25 +134,12 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
       e.preventDefault()
       lastPoint.current = { x: e.clientX, y: e.clientY }
       setHeld((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h))
-      const overTrash = isOverTrash(e.clientX, e.clientY)
-      setTrashActive(overTrash)
-      setHoverZone(overTrash ? null : zoneAt(e.clientX, e.clientY))
+      setHoverZone(zoneAt(e.clientX, e.clientY))
     }
 
     function finishAt(x: number, y: number) {
       const current = heldRef.current
       if (!current) return
-
-      if (isOverTrash(x, y)) {
-        // 垃圾桶只是吸附呈現；資料結果跟其他格線外落點完全相同。
-        onDropAway(current)
-        setHeld(null)
-        setHoverZone(null)
-        setTrashActive(false)
-        lastPoint.current = null
-        navigator.vibrate?.([10, 35, 18])
-        return
-      }
 
       const zone = zoneAt(x, y)
       if (!zone) {
@@ -171,7 +147,6 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
         onDropAway(current)
         setHeld(null)
         setHoverZone(null)
-        setTrashActive(false)
         lastPoint.current = null
         return
       }
@@ -198,7 +173,6 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
         lastPoint.current = null
       }
       setHoverZone(null)
-      setTrashActive(false)
     }
 
     function onUp(e: PointerEvent) {
@@ -218,7 +192,7 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
       window.removeEventListener('pointerup', onUp)
       window.removeEventListener('pointercancel', onCancel)
     }
-  }, [dragging, zoneAt, tileAt, isOverTrash, onDropInto, onDropAway])
+  }, [dragging, zoneAt, tileAt, onDropInto, onDropAway])
 
   /** 按住還沒到 HOLD_MS 就移動 → 當成捲動，取消拿起 */
   const maybeCancel = useCallback(
@@ -230,5 +204,5 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
     [clearPending],
   )
 
-  return { held, hoverZone, trashActive, begin, maybeCancel, endPending: clearPending }
+  return { held, hoverZone, begin, maybeCancel, endPending: clearPending }
 }

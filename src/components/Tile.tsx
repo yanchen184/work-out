@@ -16,8 +16,6 @@ interface TileProps {
   readonly ghost?: boolean
   /** 浮在手上跟著手指跑的那一顆 */
   readonly floating?: boolean
-  /** 已靠近底部垃圾桶，視覺上吸附進去 */
-  readonly absorbed?: boolean
   readonly onPointerDown?: (e: React.PointerEvent) => void
   readonly onPointerMove?: (e: React.PointerEvent) => void
   readonly onPointerUp?: () => void
@@ -34,7 +32,6 @@ export function Tile({
   done,
   ghost,
   floating,
-  absorbed,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -46,7 +43,6 @@ export function Tile({
     done ? 'is-done' : '',
     ghost ? 'is-ghost' : '',
     floating ? 'is-floating' : '',
-    absorbed ? 'is-absorbed' : '',
   ]
     .filter(Boolean)
     .join(' ')
