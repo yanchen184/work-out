@@ -154,6 +154,28 @@ describe('App — 拖放', () => {
 })
 
 describe('App — 格線外移到補做', () => {
+  it('從圖片位置按住也由整顆方塊接管拖曳', async () => {
+    await renderApp()
+
+    const source = tile(0, 'morning', '二三頭')
+    const icon = source.querySelector('.training-icon') as HTMLImageElement
+    const capture = vi.fn()
+    source.setPointerCapture = capture
+
+    expect(icon).toBeTruthy()
+    expect(getComputedStyle(icon).pointerEvents).toBe('none')
+
+    fireEvent.pointerDown(icon, { pointerId: 9, clientX: 10, clientY: 10 })
+
+    expect(capture).toHaveBeenCalledWith(9)
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 220))
+    })
+
+    expect(document.querySelector('.tile.is-floating')).toBeTruthy()
+  })
+
   it('按下時 capture 同一支手指，滑出原方塊後仍收得到放手', async () => {
     await renderApp()
 

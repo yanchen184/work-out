@@ -40,6 +40,7 @@ export function TrainingIcon({ groupId }: { readonly groupId: string }) {
       alt=""
       aria-hidden="true"
       draggable={false}
+      style={{ pointerEvents: 'none' }}
       data-training-icon={groupId}
     />
   )

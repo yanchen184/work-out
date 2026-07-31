@@ -83,7 +83,7 @@
 
 ## 四、驗收標準（沒做到不算完成）
 
-1. **`npm test` 全綠**（目前 161 個測試，5 個檔）。
+1. **`npm test` 全綠**（目前 162 個測試，5 個檔）。
 2. **`npm run build` 成功**。
 3. **開瀏覽器看真實渲染並截圖**——這條最重要。型別過、build 綠、邏輯對**都不算**視覺正確。
    `overflow:hidden` 造成的截斷、flex 擠壓、換行爆版都不會報錯，只有眼睛抓得到。
@@ -101,6 +101,8 @@
    自訂訓練存在本週計畫、跨重整與跨裝置同步，但儲存永久模板時必須排除。
    iOS 必須從 pointerdown 就 capture 並設定
    `touch-action:none`，不能等到拿起後才設定，否則 Safari 會送 `pointercancel`。
+   圖片與方塊內層必須維持 `pointer-events:none`，確保從圖騰起手也命中外層 `.tile`；
+   不可只設 `draggable=false`，那仍可能被 iOS Safari 的圖片手勢攔截。
    走的是 pointer events（不是 HTML5 drag-and-drop，那個在觸控上不會觸發）。
 
 跑起來：

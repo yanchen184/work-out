@@ -30,6 +30,15 @@
   user-select: none;
 }
 
+/*
+ * 圖片、文字與裝飾都只是方塊的內容，不該成為獨立的觸控目標。
+ * 特別是 iOS Safari 會讓從 img 起手的手勢走圖片原生行為，導致外層
+ * 方塊收不到完整的 pointer sequence；統一命中 .tile 才能整顆都可拖。
+ */
+.tile > * {
+  pointer-events: none;
+}
+
 /* ── 標題列 ───────────────────────────────────── */
 
 .hd {
@@ -359,6 +368,9 @@
   height: 100%;
   object-fit: contain;
   border-radius: 7px;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 
 .tile-copy {
