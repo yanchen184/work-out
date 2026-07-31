@@ -248,7 +248,7 @@ describe('loadWeek — 雲端讀取', () => {
   })
 
   it('本機有雲端沒有的勾 → 合併結果要推回雲端補上', async () => {
-    const local = { ...toggleCheck(base(), 0, 'morning', 'arms'), updatedAt: 1000 }
+    const local = { ...toggleCheck(base(), 0, 'morning', 'arms'), updatedAt: 3000 }
     localStorage.setItem(`workout:bob:week:${WEEK}`, JSON.stringify(local))
     cloud.set(PATH, JSON.parse(JSON.stringify({ ...base(), updatedAt: 2000 })))
 

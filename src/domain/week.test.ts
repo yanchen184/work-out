@@ -445,6 +445,24 @@ describe('mergeWeekPlans — 兩台裝置各自離線打勾', () => {
     expect(mergeWeekPlans(a, b).checked).toEqual([checkKey(0, 'morning', 'arms')])
   })
 
+  it('較新版本取消打勾 → 舊版本不能把勾復活', () => {
+    const checked = { ...toggleCheck(base, 3, 'evening', 'basketball'), updatedAt: 1000 }
+    const unchecked = { ...base, updatedAt: 2000 }
+
+    expect(mergeWeekPlans(checked, unchecked).checked).not.toContain(
+      checkKey(3, 'evening', 'basketball'),
+    )
+  })
+
+  it('較新版本新增打勾 → 採用新增後狀態', () => {
+    const old = { ...base, updatedAt: 1000 }
+    const checked = { ...toggleCheck(base, 3, 'evening', 'basketball'), updatedAt: 2000 }
+
+    expect(mergeWeekPlans(old, checked).checked).toContain(
+      checkKey(3, 'evening', 'basketball'),
+    )
+  })
+
   it('schedule 取較新的那份（整體排版不逐項合併）', () => {
     const a = { ...base, updatedAt: 1000 }
     const b = { ...removeFromSlot(base, 3, 'evening', 'basketball'), updatedAt: 2000 }

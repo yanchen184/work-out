@@ -63,6 +63,11 @@ export function createWeekPlan(weekKey: string, schedule: Schedule): WeekPlan {
   return { weekKey, schedule, checked: [], makeups: [], updatedAt: Date.now() }
 }
 
+/** 同一毫秒連點也必須有嚴格遞增版本，否則遠端同 timestamp 可能反蓋本機。 */
+function nextUpdatedAt(plan: WeekPlan): number {
+  return Math.max(Date.now(), plan.updatedAt + 1)
+}
+
 /** ---------- 不可變更新 ---------- */
 
 function replaceSlot(
@@ -88,7 +93,7 @@ export function toggleCheck(
   return {
     ...plan,
     checked: has ? plan.checked.filter((k) => k !== key) : [...plan.checked, key],
-    updatedAt: Date.now(),
+    updatedAt: nextUpdatedAt(plan),
   }
 }
 
@@ -116,7 +121,7 @@ export function setSlotChecked(
   return {
     ...plan,
     checked: done ? [...rest, ...keys] : rest,
-    updatedAt: Date.now(),
+    updatedAt: nextUpdatedAt(plan),
   }
 }
 
@@ -153,7 +158,7 @@ export function swapGroup(
     // 舊項目的勾要清掉，新項目從未打勾開始
     checked: plan.checked.filter((k) => k !== checkKey(day, slot, fromGroupId)),
     makeups,
-    updatedAt: Date.now(),
+    updatedAt: nextUpdatedAt(plan),
   }
 }
 
@@ -171,7 +176,7 @@ export function addToSlot(
     schedule: replaceSlot(plan.schedule, day, slot, [...current, groupId]),
     // 若補做池有這項，視為已補回
     makeups: plan.makeups.filter((m) => m.groupId !== groupId),
-    updatedAt: Date.now(),
+    updatedAt: nextUpdatedAt(plan),
   }
 }
 
@@ -202,7 +207,7 @@ export function removeFromSlot(
           ),
           { groupId, fromDay: day, fromSlot: slot, dismissed: false },
         ],
-    updatedAt: Date.now(),
+    updatedAt: nextUpdatedAt(plan),
   }
 }
 
@@ -278,7 +283,7 @@ export function moveGroup(plan: WeekPlan, from: DragSource, to: DropTarget): Mov
       checked: wasChecked ? [...checked, checkKey(to.day, to.slot, from.groupId)] : checked,
       // 搬進來的項目若原本欠著，視為補回
       makeups: plan.makeups.filter((m) => m.groupId !== from.groupId),
-      updatedAt: Date.now(),
+      updatedAt: nextUpdatedAt(plan),
     },
     displaced,
   }
@@ -305,7 +310,7 @@ export function dropToMakeup(
       ),
       { groupId, fromDay, fromSlot, dismissed: false },
     ],
-    updatedAt: Date.now(),
+    updatedAt: nextUpdatedAt(plan),
   }
 }
 
@@ -316,7 +321,7 @@ export function dismissMakeup(plan: WeekPlan, groupId: string): WeekPlan {
     makeups: plan.makeups.map((m) =>
       m.groupId === groupId ? { ...m, dismissed: true } : m,
     ),
-    updatedAt: Date.now(),
+    updatedAt: nextUpdatedAt(plan),
   }
 }
 
@@ -393,18 +398,28 @@ export { emptySchedule }
  * 整份蓋掉，先打的那個勾就這樣消失，而且使用者完全沒有感覺。打勾代表真的做過
  * 的訓練，掉一個就是掉一次紀錄。
  *
- * 所以 `checked` 用聯集：兩台各打各的都留著。
+ * `checked` 的合併分兩種：
+ * - 一份是另一份的子集合：代表單純新增或取消，採用 updatedAt 較新的完整狀態。
+ * - 兩份各有對方沒有的勾：代表兩台離線期間各自新增，才取聯集保住兩邊紀錄。
  *
- * 代價要講清楚：聯集之下「取消打勾」可能被另一台的舊資料復活——A 取消了勾，
- * 但 B 手上還有那個勾，合併後又出現。這是**刻意的取捨**：漏掉真的做過的訓練，
- * 比多出一個可以再點掉的勾嚴重得多。
+ * 這樣在線 realtime 的取消不會被舊勾復活，同時仍保住最常見的離線並行新增。
  *
  * `schedule` 與 `makeups` 仍走 last-write-wins：它們是整體排版，
  * 逐項合併會生出兩台都沒排過的第三種課表，比直接取較新的更難理解。
  */
 export function mergeWeekPlans(a: WeekPlan, b: WeekPlan): WeekPlan {
   const newer = b.updatedAt >= a.updatedAt ? b : a
-  const merged = [...new Set([...a.checked, ...b.checked])]
+  const aKeys = new Set(a.checked)
+  const bKeys = new Set(b.checked)
+  const aIsSubset = a.checked.every((key) => bKeys.has(key))
+  const bIsSubset = b.checked.every((key) => aKeys.has(key))
+  const sameLayout =
+    JSON.stringify(a.schedule) === JSON.stringify(b.schedule) &&
+    JSON.stringify(a.makeups) === JSON.stringify(b.makeups)
+  const merged =
+    sameLayout && (aIsSubset || bIsSubset)
+      ? [...newer.checked]
+      : [...new Set([...a.checked, ...b.checked])]
 
   // 只留還排在課表上、或還欠著補做的勾——被移除的項目不該靠合併復活
   const alive = new Set<string>()

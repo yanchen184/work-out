@@ -71,7 +71,7 @@ const rows = [
   ['ok', 'Firestore 安全規則', '只允許三個 uid 的 weeks/meta 兩種路徑，其餘全拒',
    'REST 實測 4 條：users/hacker 與 users/bob/junk 皆 PERMISSION_DENIED'],
   ['ok', 'Realtime 雲端同步', '同帳號的兩個分頁／手機與電腦，不刷新也會立即看到打勾',
-   '2026-07-31 補上 Firestore onSnapshot；自動測試鎖住即時推送與「雲端讀取途中打勾不被舊回應覆蓋」'],
+   '2026-07-31 補上 Firestore onSnapshot；測試鎖住即時推送、讀取競態，以及取消勾選不被舊資料復活'],
   ['ok', '線上部署（自訂網域）', 'work.yanchen.app，push main 自動更新',
    'CI 綠 + 線上實測：https 200、舊網址 github.io/work-out/ 301 轉來'],
 ]
@@ -122,7 +122,7 @@ const html = `<!doctype html>
   <div class="card">
     <div class="stat">
       <div><b>${rows.length}/${rows.length}</b><span>驗收條件通過</span></div>
-      <div><b>140</b><span>單元 + 元件測試</span></div>
+      <div><b>142</b><span>單元 + 元件測試</span></div>
       <div><b>51</b><span>瀏覽器實測項（版面 22 + PWA 本機 14 + PWA 線上 15）</span></div>
       <div><b>11</b><span>訓練部位配額</span></div>
     </div>
