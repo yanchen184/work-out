@@ -3,7 +3,7 @@ import type { DayIndex, Schedule, SlotKey, WeekPlan } from '../domain/types'
 import {
   addToSlot,
   dismissMakeup,
-  discardGroup,
+  dropToMakeup,
   moveGroup,
   mergeWeekPlans,
   removeFromSlot,
@@ -271,11 +271,11 @@ export function useWorkout() {
       [plan, persist],
     ),
 
-    /** 手上的項目放到 7 天 × 早晚格線外 → 直接丟棄 */
+    /** 放到 7 天 × 早晚格線外 → 原格移除，未完成的進本週補做 */
     dropAway: useCallback(
       (groupId: string, fromDay: DayIndex, fromSlot: SlotKey) => {
         if (!plan) return
-        const next = discardGroup(plan, groupId, fromDay, fromSlot)
+        const next = dropToMakeup(plan, groupId, fromDay, fromSlot)
         if (next !== plan) persist(next)
       },
       [plan, persist],

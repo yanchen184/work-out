@@ -153,7 +153,7 @@ describe('App — 拖放', () => {
   })
 })
 
-describe('App — 格線外丟棄', () => {
+describe('App — 格線外與垃圾桶都移到補做', () => {
   it('按下時 capture 同一支手指，滑出原方塊後仍收得到放手', async () => {
     await renderApp()
 
@@ -166,7 +166,7 @@ describe('App — 格線外丟棄', () => {
     expect(capture).toHaveBeenCalledWith(7)
   })
 
-  it('往底部中央滑時顯示垃圾桶吸附，放手後刪除', async () => {
+  it('往底部中央滑時顯示垃圾桶吸附，放手後原格消失並進補做', async () => {
     await renderApp()
 
     const source = tile(0, 'morning', '二三頭')
@@ -198,9 +198,12 @@ describe('App — 格線外丟棄', () => {
 
     expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
     expect(screen.queryByLabelText('拖到這裡丟棄')).toBeNull()
+    const makeup = document.querySelector('.makeup') as HTMLElement
+    expect(makeup).toBeTruthy()
+    expect(within(makeup).getByText('二三頭')).toBeTruthy()
   })
 
-  it('手上的方塊放到 7 天 × 早晚格線外 → 從本週刪除', async () => {
+  it('手上的方塊放到格線外 → 原格消失並進本週補做', async () => {
     await renderApp()
 
     const source = tile(0, 'morning', '二三頭')
@@ -218,10 +221,12 @@ describe('App — 格線外丟棄', () => {
     document.elementFromPoint = original
 
     expect(within(cell(0, 'morning')).queryByText('二三頭')).toBeNull()
-    expect(document.querySelector('.makeup')).toBeNull()
+    const makeup = document.querySelector('.makeup') as HTMLElement
+    expect(makeup).toBeTruthy()
+    expect(within(makeup).getByText('二三頭')).toBeTruthy()
   })
 
-  it('已打勾的丟到格線外也直接刪除，且不進補做', async () => {
+  it('已打勾的放到格線外會從原格消失，但不進補做', async () => {
     const user = userEvent.setup()
     await renderApp()
 

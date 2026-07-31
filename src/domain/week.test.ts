@@ -3,7 +3,7 @@ import {
   addToSlot,
   createWeekPlan,
   dismissMakeup,
-  discardGroup,
+  dropToMakeup,
   formatWeekRange,
   mergeWeekPlans,
   mondayOfWeekKey,
@@ -389,29 +389,31 @@ describe('moveGroup — 拖放：拿起來放到別格', () => {
   })
 })
 
-describe('discardGroup — 手上的項目放到格線外 → 丟棄', () => {
-  it('沒打勾的項目 → 從原時段刪除，不進補做', () => {
+describe('dropToMakeup — 格線外放手 → 原格移除並進補做', () => {
+  it('未完成項目會從來源格消失並進補做', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const next = discardGroup(plan, 'back', 1, 'evening')
+    const next = dropToMakeup(plan, 'back', 1, 'evening')
 
     expect(next.schedule[1].evening).not.toContain('back')
-    expect(next.makeups.map((m) => m.groupId)).not.toContain('back')
+    expect(next.makeups).toContainEqual({
+      groupId: 'back',
+      fromDay: 1,
+      fromSlot: 'evening',
+      dismissed: false,
+    })
   })
 
-  it('已打勾的項目 → 方塊與勾一起刪除', () => {
-    let plan = createWeekPlan('2026-W31', defaultSchedule())
-    plan = toggleCheck(plan, 1, 'evening', 'back')
-    const next = discardGroup(plan, 'back', 1, 'evening')
-    expect(next.schedule[1].evening).not.toContain('back')
-    expect(next.checked).not.toContain(checkKey(1, 'evening', 'back'))
-    expect(next.makeups.map((m) => m.groupId)).not.toContain('back')
-  })
-
-  it('已經不在來源格的項目 → 不重複改資料', () => {
+  it('被頂出來、已不在來源格的項目仍會進補做', () => {
     const plan = createWeekPlan('2026-W31', defaultSchedule())
-    const once = discardGroup(plan, 'back', 1, 'evening')
-    const twice = discardGroup(once, 'back', 1, 'evening')
-    expect(twice).toBe(once)
+    const moved = moveGroup(
+      plan,
+      { day: 0, slot: 'morning', groupId: 'arms' },
+      { day: 1, slot: 'morning', displaceGroupId: 'hiit' },
+    )
+    const next = dropToMakeup(moved.plan, 'hiit', 1, 'morning')
+
+    expect(next.schedule[1].morning).not.toContain('hiit')
+    expect(next.makeups.map((m) => m.groupId)).toContain('hiit')
   })
 })
 
@@ -480,7 +482,7 @@ describe('mergeWeekPlans — 兩台裝置各自離線打勾', () => {
 
   it('較新版本把項目移進補做且未打勾 → 採較新狀態，不復活舊勾', () => {
     const a = { ...toggleCheck(base, 1, 'evening', 'back'), updatedAt: 1000 }
-    const b = { ...discardGroup(base, 'back', 1, 'evening'), updatedAt: 2000 }
+    const b = { ...dropToMakeup(base, 'back', 1, 'evening'), updatedAt: 2000 }
 
     const merged = mergeWeekPlans(a, b)
     expect(merged.checked).not.toContain(checkKey(1, 'evening', 'back'))

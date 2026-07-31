@@ -33,7 +33,7 @@ const TRASH_HEIGHT = 150
 interface UseDragOptions {
   /** 放到某一格。回傳被頂出來的項目 id，沒有就 null */
   readonly onDropInto: (held: Held, zone: DropZone, displaceGroupId?: string) => string | null
-  /** 放到 7 天 × 早晚格線外，直接丟棄 */
+  /** 放到 7 天 × 早晚格線外：原格移除，未完成的進本週補做 */
   readonly onDropAway: (held: Held) => void
 }
 
@@ -146,6 +146,7 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
       if (!current) return
 
       if (isOverTrash(x, y)) {
+        // 垃圾桶只是吸附呈現；資料結果跟其他格線外落點完全相同。
         onDropAway(current)
         setHeld(null)
         setHoverZone(null)
@@ -157,7 +158,7 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
 
       const zone = zoneAt(x, y)
       if (!zone) {
-        // 不在星期一到日的早／晚格子裡 → 直接丟棄
+        // 不在星期一到日的早／晚格子裡 → 原格移除，未完成的進本週補做
         onDropAway(current)
         setHeld(null)
         setHoverZone(null)

@@ -69,7 +69,7 @@ tr.no strong{color:#fbbf24}
   <div class="card">
     <div class="stat">
       <div><b>20/20</b><span>驗收條件通過</span></div>
-      <div><b>144</b><span>單元 + 元件測試</span></div>
+      <div><b>143</b><span>單元 + 元件測試</span></div>
       <div><b>51</b><span>瀏覽器實測項（版面 22 + PWA 本機 14 + PWA 線上 15）</span></div>
       <div><b>11</b><span>訓練部位配額</span></div>
     </div>
@@ -118,8 +118,8 @@ tr.no strong{color:#fbbf24}
     </tr>
     <tr class="ok">
       <td class="st">✅</td>
-      <td><strong>底部垃圾桶吸附刪除</strong><span class="spec">拿起後底部出現垃圾桶；往下靠近時方塊吸附，放手從本週刪除</span></td>
-      <td class="ev">iOS 手勢從 pointerdown 即 capture；元件測試涵蓋吸附、放手刪除、已打勾刪除且不進補做池</td>
+      <td><strong>底部垃圾桶吸附移到補做</strong><span class="spec">拿起後底部出現垃圾桶；往下靠近時方塊吸附，放手從原格移除並進本週補做</span></td>
+      <td class="ev">垃圾桶與其他格線外落點共用同一資料邏輯，只有呈現不同；元件測試涵蓋兩條路徑</td>
     </tr>
     <tr class="ok">
       <td class="st">✅</td>
@@ -219,7 +219,8 @@ tr.no strong{color:#fbbf24}
       <li><strong>被頂掉的黏在手上</strong> — 放進已有項目的格子，原本那顆接著被拿在手上，
         可以直接放到別格，或往下拖進垃圾桶丟棄，不用重新拿一次。</li>
       <li><strong>手機式垃圾桶刪除</strong> — 拿起方塊時底部浮出垃圾桶，靠近後方塊會縮小吸附，
-        垃圾桶開蓋並震動提示，放手才真的刪除。iOS 從按下就 capture pointer，
+        垃圾桶開蓋並震動提示；放手後原格消失並進補做。它和其他格線外放手的功能相同，
+        只差吸附呈現。iOS 從按下就 capture pointer，
         避免 Safari 接管手勢造成「拿得起來但丟不掉」。</li>
       <li><strong>預設模板一天一早一晚</strong> — 早上與晚上各一攤，不是全擠在早上。模板只是起點，隨時可改。</li>
       <li><strong>只打勾不記組數</strong> — 在健身房不想輸入數字；組數目標放在部位進度當參考。</li>
