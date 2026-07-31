@@ -1,7 +1,8 @@
 import type { CSSProperties } from 'react'
 import type { MuscleGroup } from '../domain/types'
+import { TrainingIcon } from './TrainingIcon'
 
-export function unitLabel(amount: number, unit: string): string {
+function unitLabel(amount: number, unit: string): string {
   if (amount <= 0) return ''
   if (unit === 'sets') return `${amount}組`
   if (unit === 'minutes') return `${amount}分`
@@ -23,8 +24,8 @@ interface TileProps {
 }
 
 /**
- * 一個正方形訓練方塊。
- * 打勾態＝實心飽和色 + ✓ 角標；未打勾＝暗底 + 彩色邊框。
+ * 一個帶專屬圖騰與切角層次的訓練方塊。
+ * 打勾態＝實心飽和色 + ✓ 角標；未打勾＝淡色立體卡 + 彩色邊框。
  */
 export function Tile({
   group,
@@ -76,10 +77,16 @@ export function Tile({
       aria-label={`${group.name}${done ? '（已完成）' : ''}`}
       title={floating ? undefined : done ? '點一下取消打勾' : '點一下打勾 · 按住可拖曳'}
     >
-      <span className="tile-name">{group.name}</span>
-      {group.targetAmount > 0 && (
-        <span className="tile-goal">{unitLabel(group.targetAmount, group.unit)}</span>
-      )}
+      <span className="tile-visual" aria-hidden>
+        <TrainingIcon groupId={group.id} />
+      </span>
+      <span className="tile-copy">
+        <span className="tile-name">{group.name}</span>
+        {group.targetAmount > 0 && (
+          <span className="tile-goal">{unitLabel(group.targetAmount, group.unit)}</span>
+        )}
+      </span>
+      <span className="tile-fold" aria-hidden />
       {done && (
         <span className="tile-check" aria-hidden>
           ✓

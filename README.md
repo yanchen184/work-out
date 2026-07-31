@@ -3,7 +3,8 @@
 ![每週健身](docs/images/readme-hero.jpg)
 
 一頁式的每週健身打勾紀錄。7 天 × 早／晚時段一屏看完，點一下就打勾，
-排錯了就把方塊**拿起來換位置**。可以加到 iPhone 主畫面當 app 用，離線照樣打勾。
+排錯了就把方塊**拿起來換位置**。11 種訓練各有專屬圖騰與色彩，一眼就能找到；
+可以加到 iPhone 主畫面當 app 用，離線照樣打勾。
 
 **線上版：https://work.yanchen.app/**
 
@@ -21,6 +22,8 @@
 - **換掉沒做的東西不會憑空消失**，會進「本週補做」，提醒這週還欠什麼。
 - **手機優先**。一屏看完整週，不用捲；拖曳走 pointer events，
   iOS Safari 上真的能用（HTML5 drag-and-drop 在觸控上根本不會觸發）。
+- **圖騰比文字更快辨識**。胸、背、跑步間歇、球類等 11 種項目都有自己的線性圖騰；
+  仍保留名稱和份量，不靠顏色猜內容。
 
 ## 功能
 
@@ -43,10 +46,6 @@
 | 拿起來放下去 | 部位進度 | 每週模板 |
 |---|---|---|
 | ![拖曳](docs/images/readme-drag.png) | ![部位進度](docs/images/readme-progress.png) | ![每週模板](docs/images/readme-template.png) |
-
-深色模式：
-
-![深色模式](docs/images/readme-main-dark.png)
 
 ## 裝到 iPhone
 
@@ -168,7 +167,7 @@ src/
 - `App.test.tsx`（鍵盤與 dialog）— Enter／空白鍵打勾、拉盤 Esc 關閉、焦點移入與還原、
   Tab 不會逃出拉盤
 
-瀏覽器端另外跑過真實 round-trip：22 項手機版視覺與互動（含破版、深色模式、
+瀏覽器端另外跑過真實 round-trip：22 項手機版視覺與互動（含破版、固定淺色模式、
 320px 窄螢幕、重新整理後資料保留）、15 項線上版 PWA 驗收（加到主畫面、
 service worker 預快取、斷網後照樣打勾），以及跨裝置同步驗證：用兩個獨立的
 瀏覽器 context（各自空的 localStorage = 兩台裝置）互相確認打勾真的傳得過去、

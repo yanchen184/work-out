@@ -277,21 +277,45 @@
   /* 一屏內要塞下七列，所以高度由格線分配，不用固定正方形卡死 */
   height: 100%;
   min-height: 0;
-  border-radius: 12px;
+  border-radius: 14px 14px 11px 14px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  padding: 4px;
-  border: 1.5px solid var(--tone);
-  background: var(--tone-soft);
+  gap: clamp(4px, 7cqw, 8px);
+  padding: 5px 8px 5px 7px;
+  border: 1.5px solid color-mix(in srgb, var(--tone) 88%, white);
+  background:
+    radial-gradient(circle at 18% 4%, rgba(255, 255, 255, 0.92), transparent 42%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--tone-soft) 72%, white),
+      var(--tone-soft) 70%,
+      color-mix(in srgb, var(--tone) 16%, var(--tone-soft))
+    );
   color: var(--text);
   overflow: hidden;
+  isolation: isolate;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -1px 0 color-mix(in srgb, var(--tone) 26%, transparent),
+    -2px 2px 0 -0.5px color-mix(in srgb, var(--tone) 19%, transparent),
+    -4px 4px 0 -1px color-mix(in srgb, var(--tone) 10%, transparent),
+    0 5px 9px color-mix(in srgb, var(--tone) 13%, transparent);
   transition:
     transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.18s ease,
     opacity 0.18s ease;
+}
+
+.tile::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 3px;
+  border-radius: 10px 10px 8px 10px;
+  border: 1px solid color-mix(in srgb, white 64%, transparent);
+  pointer-events: none;
 }
 
 /* 未打勾：右上一顆小色點 */
@@ -304,6 +328,36 @@
   height: 7px;
   border-radius: 50%;
   background: var(--tone);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--tone-soft) 78%, white),
+    0 1px 4px color-mix(in srgb, var(--tone) 42%, transparent);
+}
+
+.tile-visual {
+  flex: 0 0 clamp(22px, 34cqw, 34px);
+  width: clamp(22px, 34cqw, 34px);
+  height: clamp(22px, 34cqw, 34px);
+  display: grid;
+  place-items: center;
+  color: var(--tone);
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8));
+}
+
+.training-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 7px;
+}
+
+.tile-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
 }
 
 .tile-name {
@@ -319,6 +373,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-all;
+  width: 100%;
 }
 
 .tile-goal {
@@ -327,19 +382,58 @@
   line-height: 1.1;
 }
 
+.tile-fold {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 16px;
+  height: 16px;
+  border-radius: 10px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--tone) 48%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--tone) 34%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, white 78%, var(--tone-soft)),
+    color-mix(in srgb, var(--tone) 24%, var(--tone-soft))
+  );
+  box-shadow: -2px -2px 5px rgba(255, 255, 255, 0.52);
+}
+
 /* 打勾：實心飽和色 + 白圈勾角標 */
 .tile.is-done {
-  background: linear-gradient(155deg, color-mix(in srgb, var(--tone) 88%, white), var(--tone));
+  background:
+    radial-gradient(circle at 16% 3%, rgba(255, 255, 255, 0.34), transparent 38%),
+    linear-gradient(150deg, color-mix(in srgb, var(--tone) 78%, white), var(--tone) 72%);
   border-color: var(--tone);
   color: #fff;
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 1px 2px color-mix(in srgb, var(--tone) 25%, transparent);
 }
 
 .tile.is-done::after {
   display: none;
 }
 
+.tile.is-done::before {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.tile.is-done .tile-visual {
+  color: #fff;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.18));
+}
+
 .tile.is-done .tile-goal {
   color: rgba(255, 255, 255, 0.85);
+}
+
+.tile.is-done .tile-fold {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.38), rgba(0, 0, 0, 0.08));
+  box-shadow: -2px -2px 4px rgba(255, 255, 255, 0.16);
 }
 
 .tile-check {
@@ -359,6 +453,76 @@
 
 .tile:active {
   transform: scale(0.94);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
+@container (max-width: 72px) {
+  .tile {
+    gap: 2px;
+    padding-inline: 4px;
+  }
+
+  .tile-visual {
+    flex-basis: 22px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .tile-name {
+    display: block;
+    font-size: 10.5px;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+  }
+
+  .tile-goal {
+    font-size: 9px;
+  }
+
+  .tile-fold {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* 320px 窄螢幕的雙卡與歷史資料三卡都改為上下排列：
+   名稱可使用整張卡寬，四字項目不會被省略。 */
+@container (max-width: 82px) {
+  .tile {
+    flex-direction: column;
+    gap: 0;
+    padding: 3px 2px;
+  }
+
+  .tile-visual {
+    flex-basis: 19px;
+    width: 19px;
+    height: 19px;
+  }
+
+  .tile-copy {
+    align-items: center;
+    width: 100%;
+  }
+
+  .tile-name {
+    display: block;
+    font-size: 9.5px;
+    line-height: 1.05;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    line-clamp: unset;
+  }
+
+  .tile-goal,
+  .tile-fold {
+    display: none;
+  }
 }
 
 /* 被拿起後留在原位的凹槽 */
@@ -383,6 +547,12 @@
     0 0 22px color-mix(in srgb, var(--tone) 55%, transparent),
     0 18px 30px rgba(0, 0, 0, 0.45);
   animation: lift 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.tile.is-floating .tile-visual {
+  flex-basis: 34px;
+  width: 34px;
+  height: 34px;
 }
 
 @keyframes lift {
@@ -499,8 +669,16 @@
 
 .tab-ico {
   color: var(--indigo);
-  font-size: 13px;
-  letter-spacing: -1px;
+  width: 19px;
+  height: 19px;
+  display: grid;
+  place-items: center;
+}
+
+.ui-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* ── 底部拉盤 ─────────────────────────────────── */
@@ -540,6 +718,10 @@
   animation: slideup 0.24s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.sheet:focus {
+  outline: none;
+}
+
 @keyframes slideup {
   from {
     transform: translateY(100%);
@@ -558,38 +740,172 @@
   margin: 4px auto 12px;
 }
 
+.sheet-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 13px;
+}
+
 .sheet-title {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 17px;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheet-title-icon {
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border-radius: 9px;
+  color: var(--indigo);
+  background: color-mix(in srgb, var(--indigo) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--indigo) 28%, var(--line));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
+}
+
+.sheet-summary {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sheet-summary strong {
+  margin-left: 4px;
+  color: var(--sky);
+  font-size: 14px;
 }
 
 .sheet-note {
   margin: 0 0 14px;
+  padding: 11px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--indigo) 24%, var(--line));
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--indigo) 8%, var(--surface)),
+      color-mix(in srgb, var(--sky) 5%, var(--surface))
+    );
   font-size: 13px;
   line-height: 1.6;
   color: var(--text-dim);
 }
 
+.sheet-note p {
+  margin: 0;
+}
+
+.sheet-note-icon {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--indigo);
+  margin-top: 1px;
+}
+
 .sheet-actions {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
 }
 
 .sheet-btn {
-  height: 46px;
-  border-radius: 12px;
-  background: var(--surface-2);
+  position: relative;
+  min-height: 66px;
+  padding: 10px 42px 10px 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  border-radius: 15px 15px 12px;
+  background:
+    radial-gradient(circle at 14% 0, rgba(255, 255, 255, 0.86), transparent 42%),
+    linear-gradient(145deg, var(--surface), var(--surface-2));
   border: 1px solid var(--line);
-  font-size: 15px;
-  font-weight: 600;
+  text-align: left;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 3px 8px rgba(28, 28, 26, 0.06);
 }
 
 .sheet-btn.is-primary {
-  background: var(--indigo);
+  background:
+    radial-gradient(circle at 12% 0, rgba(255, 255, 255, 0.28), transparent 42%),
+    linear-gradient(145deg, color-mix(in srgb, var(--indigo) 82%, white), var(--indigo));
   border-color: var(--indigo);
   color: #fff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    0 5px 12px color-mix(in srgb, var(--indigo) 24%, transparent);
+}
+
+.sheet-btn-icon {
+  flex: 0 0 35px;
+  width: 35px;
+  height: 35px;
+  padding: 6px;
+  border-radius: 11px;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.sheet-btn.is-primary .sheet-btn-icon {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.13);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.sheet-btn-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sheet-btn-copy strong {
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.sheet-btn-copy small {
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.sheet-btn.is-primary .sheet-btn-copy small {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.sheet-btn-fold {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 24px;
+  height: 24px;
+  border-radius: 13px 0 0;
+  border-top: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  background: linear-gradient(135deg, var(--surface), var(--line));
+}
+
+.sheet-btn.is-primary .sheet-btn-fold {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(31, 25, 126, 0.5));
 }
 
 /* 部位進度 */
@@ -597,14 +913,35 @@
 .prog {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 6px;
 }
 
 .prog-row {
+  --row-tone: var(--indigo);
   display: grid;
-  grid-template-columns: 62px 1fr 46px;
+  grid-template-columns: 28px 62px 1fr 38px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-height: 39px;
+  padding: 5px 7px;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--row-tone) 20%, var(--line));
+  background:
+    linear-gradient(
+      100deg,
+      color-mix(in srgb, var(--row-tone) 8%, var(--surface)),
+      var(--surface) 62%
+    );
+}
+
+.prog-icon {
+  width: 27px;
+  height: 27px;
+  padding: 4px;
+  border-radius: 8px;
+  color: var(--row-tone);
+  background: color-mix(in srgb, var(--row-tone) 9%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--row-tone) 20%, var(--line));
 }
 
 .prog-name {
@@ -615,7 +952,7 @@
 .prog-track {
   height: 6px;
   border-radius: 6px;
-  background: var(--line);
+  background: color-mix(in srgb, var(--row-tone) 10%, var(--line));
   overflow: hidden;
 }
 
@@ -630,6 +967,18 @@
   color: var(--text-dim);
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 340px) {
+  .sheet-summary {
+    padding-inline: 7px;
+  }
+
+  .prog-row {
+    grid-template-columns: 25px 55px 1fr 34px;
+    gap: 6px;
+    padding-inline: 5px;
+  }
 }
 
 /* 加入訓練 */

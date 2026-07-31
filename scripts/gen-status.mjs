@@ -6,7 +6,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
  *   node scripts/gen-status.mjs   → 寫出 docs/status.html
  *
  * 之後用 /html-deploy 把 docs/status.html 推到同一個 slug（work-out）。
- * 截圖要換新的話：跑 Playwright 拍 390×844 深色，用
+ * 截圖要換新的話：跑瀏覽器拍 390×844 固定淺色，用
  *   sips -s format jpeg -s formatOptions 72 -Z 780 in.png --out docs/images/status-xxx.jpg
  * 蓋掉對應檔案再重跑這支。
  */
@@ -36,6 +36,8 @@ const shots = [
 const rows = [
   ['ok', '手機版版面', '一週七天 × 早/晚兩欄，整週一屏看完，不用捲',
    '線上實測 390×844：22/22 視覺驗收項全過，截圖肉眼確認七列全在一屏內'],
+  ['ok', '11 種專屬訓練圖騰', '每個部位／活動有自己的線性圖騰、漸層質感與切角層次',
+   '2026-07-31 真實瀏覽器逐一確認；間歇使用衝刺跑者、二三頭使用屈臂肌肉，依最終決定固定淺色，375px/320px 皆不截字'],
   ['ok', '訓練方塊可拿起放下', '長按拿起、拖到別格放下，有浮起與落點提示',
    '線上實測：週一早「二三頭」拖到週日晚成功，來源清空、目標出現；截圖拍到拖曳中狀態'],
   ['ok', '被頂掉的黏到手上', '放進已有項目的格子，原本那顆會被頂出來繼續拿在手上',
@@ -43,7 +45,7 @@ const rows = [
   ['ok', '放到空白處進補做', '拖離格子放掉 → 該項目進補做池（僅限沒打勾的）',
    '瀏覽器實測 + 單元測試：已打勾的被換掉不進補做池'],
   ['ok', '兩顆底部按鈕', '部位進度、每週模板各自從底部彈上來',
-   '線上實測：兩個拉盤皆正常開闔（點 grip 或背景關），截圖確認'],
+   '2026-07-31 真實瀏覽器：兩個拉盤皆正常開闔；進度列圖騰與模板操作卡截圖確認，320px 無橫向溢出'],
   ['ok', '預設模板一早一晚', '一 二三頭/胸肩、二 間歇/背、三 腹肌/有氧課程、四 二三頭/籃球、五 間歇/胸肩、六 腹肌/背、日 休',
    '線上截圖逐格核對七天皆符；69 個單元＋元件測試全過'],
   ['ok', '加到 iPhone 主畫面', 'Safari → 分享 → 加入主畫面，開啟後全螢幕、無網址列',
@@ -114,13 +116,13 @@ const html = `<!doctype html>
     <span class="badge">PWA</span>
     <span class="badge">Firestore 同步</span>
     <span class="badge ok">已上線</span>
-    <br>最後更新：2026-07-30
+    <br>最後更新：2026-07-31
   </p>
 
   <div class="card">
     <div class="stat">
       <div><b>${rows.length}/${rows.length}</b><span>驗收條件通過</span></div>
-      <div><b>69</b><span>單元 + 元件測試</span></div>
+      <div><b>138</b><span>單元 + 元件測試</span></div>
       <div><b>51</b><span>瀏覽器實測項（版面 22 + PWA 本機 14 + PWA 線上 15）</span></div>
       <div><b>11</b><span>訓練部位配額</span></div>
     </div>
@@ -160,6 +162,8 @@ ${rowHtml}
   <div class="card">
     <ul>
       <li><strong>手機優先，一屏看完整週</strong> — 七天 × 早/晚做成兩欄格線，不是往下捲的長列表。</li>
+      <li><strong>圖騰 + 文字雙重辨識</strong> — 11 種訓練各有專屬圖騰圖片，搭配原本的名稱與份量；
+        不靠顏色單獨傳達資訊。跑步間歇是衝刺跑者，二三頭是屈臂肌肉。</li>
       <li><strong>拿起來放下去，而不是選單選</strong> — 長按 180ms 才算拿起（太短會跟「點一下打勾」打架），
         期間手指移動超過 10px 就當成捲動。用 pointer events 不用 HTML5 drag-and-drop，
         後者在 iOS Safari 觸控上根本不會觸發。</li>

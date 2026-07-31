@@ -1,7 +1,10 @@
-# 交接文件 — 方塊視覺改版
+# 交接文件 — 方塊視覺改版（已完成）
 
 > 2026-07-31 建。給接手的人（Codex）看的。
 > 專案根目錄：`/Users/yanchen/workspace/ios-app/work-out`
+>
+> **完成註記（2026-07-31）**：採用「專屬線性圖騰 + 漸層質感 + 切角層次」，
+> 11 種訓練、部位進度拉盤、每週模板拉盤與底部入口已統一改版。
 
 ---
 
@@ -36,7 +39,7 @@
 |---|---|---|
 | `/Users/yanchen/workspace/ios-app/work-out/src/components/Tile.tsx` | 全檔 | 方塊元件。`unitLabel()` 產生「15組／20分／3時」；`cls` 組出 `tile` / `is-done` / `is-ghost` / `is-floating` 四種狀態；把 `--tone` / `--tone-soft` 兩個 CSS 變數綁到 group 的色票上 |
 | `/Users/yanchen/workspace/ios-app/work-out/src/App.css` | 275–380 行 | 方塊全部的樣式。`.tile` 基礎態、`.tile::after` 未完成的小圓點、`.tile.is-done` 打勾態（漸層實心）、`.tile-check` 白圈勾、`.tile.is-ghost` 拖走後的凹槽、`.tile.is-floating` 跟著手指跑的那顆 |
-| `/Users/yanchen/workspace/ios-app/work-out/src/index.css` | 11–24 行（淺色）、48 行起（深色） | 七個色票 `--indigo / --coral / --amber / --teal / --violet / --lime / --sky`，每個都有 `-soft` 版本。深色模式在 `@media (prefers-color-scheme: dark)` 內覆寫 |
+| `/Users/yanchen/workspace/ios-app/work-out/src/index.css` | `:root` 色票 | 七個色票 `--indigo / --coral / --amber / --teal / --violet / --lime / --sky`，每個都有 `-soft` 版本。依 2026-07-31 最終確認固定使用淺色模式 |
 | `/Users/yanchen/workspace/ios-app/work-out/src/domain/catalog.ts` | 6–21 行 | 十一個部位與各自的 `tone`。**要加圖示的話，欄位加在這裡** |
 
 ### 十一個部位（`catalog.ts` 的真實內容，不要自己編）
@@ -84,7 +87,7 @@
 2. **`npm run build` 成功**。
 3. **開瀏覽器看真實渲染並截圖**——這條最重要。型別過、build 綠、邏輯對**都不算**視覺正確。
    `overflow:hidden` 造成的截斷、flex 擠壓、換行爆版都不會報錯，只有眼睛抓得到。
-   - 至少要看：**淺色 + 深色**兩種模式、**手機寬度（375px）與窄螢幕（320px）**。
+   - 至少要看：固定**淺色模式**、**手機寬度（375px）與窄螢幕（320px）**。
    - 要確認：十四格一屏看得完、長名稱（「有氧課程」「腳踏車」）不爆版不截斷、
      已完成與未完成一眼分得出來、拖曳中那顆（`.is-floating`）仍然正常。
 4. **拖曳仍然能用**。長按 0.18 秒拿起來、放到別格換位置、放到空白處進補做池。
@@ -114,13 +117,11 @@ npm run build
 
 ---
 
-## 六、還沒做的事
+## 六、完成狀態
 
-1. **方塊視覺改版** ← 就是本文件第一節的任務，主線工作。
-2. **更新專案狀態頁** `https://html.yanchen.app/work-out/`。
-   方塊改版完成後要回去更新那一頁（用 `/html-deploy` 推同一個 slug `work-out`），
-   內容要有：專案名 + 一句話定位、功能清單、驗收標準逐條 ✅／⚠️
-   （**沒真的驗過不准打 ✅**）、進度與線上網址、最後更新的絕對日期。
+1. ~~**方塊視覺改版**~~ — 已於 2026-07-31 完成。
+2. ~~**更新專案狀態頁**~~ — 已於 2026-07-31 覆蓋部署同一個 `work-out` slug，
+   並以 HTTP 200 與 `/api/sites` metadata 完成 round-trip 驗證。
 
 ---
 

@@ -6,6 +6,8 @@ import { formatWeekRange, overallProgress, weekProgress } from './domain/week'
 import { checkKey, type DayIndex, type SlotKey } from './domain/types'
 import { USERS } from './lib/firebase'
 import { Tile } from './components/Tile'
+import { TrainingIcon } from './components/TrainingIcon'
+import { UiIcon } from './components/UiIcon'
 import { useDrag, type DropZone, type Held } from './lib/useDrag'
 
 const DAYS: readonly DayIndex[] = [0, 1, 2, 3, 4, 5, 6]
@@ -204,15 +206,11 @@ export default function App() {
 
       <footer className="tabs">
         <button className="tab" onClick={() => setPanel('progress')}>
-          <span className="tab-ico" aria-hidden>
-            ▊▍▎
-          </span>
+          <span className="tab-ico"><UiIcon name="progress" /></span>
           部位進度
         </button>
         <button className="tab" onClick={() => setPanel('template')}>
-          <span className="tab-ico" aria-hidden>
-            ⠿
-          </span>
+          <span className="tab-ico"><UiIcon name="template" /></span>
           每週模板
         </button>
       </footer>
@@ -252,7 +250,11 @@ export default function App() {
       )}
 
       {panel === 'progress' && (
-        <ProgressSheet rows={weekProgress(plan)} onClose={() => setPanel(null)} />
+        <ProgressSheet
+          rows={weekProgress(plan)}
+          percent={percent}
+          onClose={() => setPanel(null)}
+        />
       )}
 
       {panel === 'template' && (
@@ -280,10 +282,14 @@ export default function App() {
  */
 function Sheet({
   title,
+  titleIcon,
+  titleAside,
   onClose,
   children,
 }: {
   title: string
+  titleIcon?: React.ReactNode
+  titleAside?: React.ReactNode
   onClose: () => void
   children: React.ReactNode
 }) {
@@ -343,7 +349,13 @@ function Sheet({
         tabIndex={-1}
       >
         <button className="sheet-grip" onClick={onClose} aria-label="關閉" />
-        <h2 className="sheet-title">{title}</h2>
+        <div className="sheet-heading">
+          <h2 className="sheet-title">
+            {titleIcon && <span className="sheet-title-icon">{titleIcon}</span>}
+            {title}
+          </h2>
+          {titleAside}
+        </div>
         <div className="sheet-body">{children}</div>
       </div>
     </>
@@ -352,16 +364,34 @@ function Sheet({
 
 function ProgressSheet({
   rows,
+  percent,
   onClose,
 }: {
   rows: ReturnType<typeof weekProgress>
+  percent: number
   onClose: () => void
 }) {
   return (
-    <Sheet title="部位進度" onClose={onClose}>
+    <Sheet
+      title="部位進度"
+      titleIcon={<UiIcon name="progress" />}
+      titleAside={
+        <span className="sheet-summary">
+          本週總進度 <strong>{percent}%</strong>
+        </span>
+      }
+      onClose={onClose}
+    >
       <div className="prog">
         {rows.map((r) => (
-          <div key={r.groupId} className="prog-row">
+          <div
+            key={r.groupId}
+            className="prog-row"
+            style={{ '--row-tone': `var(--${r.tone})` } as React.CSSProperties}
+          >
+            <span className="prog-icon">
+              <TrainingIcon groupId={r.groupId} />
+            </span>
             <span className="prog-name">{r.name}</span>
             <div className="prog-track">
               <div
@@ -392,16 +422,27 @@ function TemplateSheet({
   onReset: () => void
 }) {
   return (
-    <Sheet title="每週模板" onClose={onClose}>
-      <p className="sheet-note">
-        模板是每一週的起點。單週拖來拖去不會動到模板；要永久改變就把目前這週存成模板。
-      </p>
+    <Sheet title="每週模板" titleIcon={<UiIcon name="template" />} onClose={onClose}>
+      <div className="sheet-note">
+        <span className="sheet-note-icon"><UiIcon name="info" /></span>
+        <p>模板是每一週的起點。單週拖來拖去不會動到模板；要永久改變就把目前這週存成模板。</p>
+      </div>
       <div className="sheet-actions">
         <button className="sheet-btn is-primary" onClick={onSaveCurrent}>
-          把這週存成模板
+          <span className="sheet-btn-icon"><UiIcon name="save" /></span>
+          <span className="sheet-btn-copy">
+            <strong>把這週存成模板</strong>
+            <small>將目前的安排設為新的每週模板</small>
+          </span>
+          <span className="sheet-btn-fold" aria-hidden />
         </button>
         <button className="sheet-btn" onClick={onReset}>
-          用模板重設這週
+          <span className="sheet-btn-icon"><UiIcon name="reset" /></span>
+          <span className="sheet-btn-copy">
+            <strong>用模板重設這週</strong>
+            <small>放棄這週的排法，回到模板內容</small>
+          </span>
+          <span className="sheet-btn-fold" aria-hidden />
         </button>
       </div>
     </Sheet>

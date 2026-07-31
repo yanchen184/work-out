@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --bg: #f7f7f5;
   --surface: #ffffff;
   --surface-2: #fbfbfa;
@@ -8,20 +9,21 @@
   --text-dim: #76766e;
   --text-faint: #a3a39b;
 
-  --indigo: #4f46e5;
-  --indigo-soft: #eeecfd;
-  --coral: #fb7185;
-  --coral-soft: #fdeef1;
-  --amber: #f59e0b;
-  --amber-soft: #fdf3e3;
-  --teal: #0d9488;
-  --teal-soft: #e6f4f2;
-  --violet: #8b5cf6;
-  --violet-soft: #f2edfe;
-  --lime: #65a30d;
-  --lime-soft: #f0f5e4;
-  --sky: #0284c7;
-  --sky-soft: #e4f1fa;
+  /* 以確認過的生圖概念稿直接取樣，不沿用舊版高飽和色票。 */
+  --indigo: #5138df;
+  --indigo-soft: #f3f0ff;
+  --coral: #df5060;
+  --coral-soft: #fff1f3;
+  --amber: #e98b00;
+  --amber-soft: #fff7e9;
+  --teal: #149b8c;
+  --teal-soft: #edf9f7;
+  --violet: #7044db;
+  --violet-soft: #f5f1ff;
+  --lime: #5c990f;
+  --lime-soft: #f3f8e9;
+  --sky: #087fc0;
+  --sky-soft: #eef8ff;
 
   --radius: 14px;
   --radius-sm: 9px;
@@ -32,36 +34,6 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   color: var(--text);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131312;
-    --surface: #1d1d1b;
-    --surface-2: #242422;
-    --line: #2e2e2b;
-    --line-strong: #3a3a36;
-    --text: #f2f2ef;
-    --text-dim: #9d9d95;
-    --text-faint: #6e6e67;
-
-    --indigo: #8b83f5;
-    --indigo-soft: #2a2748;
-    --coral: #fb7185;
-    --coral-soft: #40252c;
-    --amber: #fbbf24;
-    --amber-soft: #3d3218;
-    --teal: #2dd4bf;
-    --teal-soft: #1a3936;
-    --violet: #a78bfa;
-    --violet-soft: #2f2748;
-    --lime: #a3e635;
-    --lime-soft: #2b3618;
-    --sky: #38bdf8;
-    --sky-soft: #16323f;
-
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.25);
-  }
 }
 
 * {
