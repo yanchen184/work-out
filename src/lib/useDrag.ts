@@ -15,6 +15,8 @@ export interface Held {
   readonly dy: number
   /** true = 這顆是被頂出來黏在手上的，不是使用者主動拿的 */
   readonly displaced: boolean
+  /** true = 目前不在課表格內（來自補做池，或剛被另一顆頂出） */
+  readonly detached: boolean
 }
 
 export interface DropZone {
@@ -84,7 +86,13 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
   )
 
   const begin = useCallback(
-    (e: React.PointerEvent, groupId: string, fromDay: DayIndex, fromSlot: SlotKey) => {
+    (
+      e: React.PointerEvent,
+      groupId: string,
+      fromDay: DayIndex,
+      fromSlot: SlotKey,
+      detached = false,
+    ) => {
       // 已經有東西在手上時，這一下是「放下」不是「拿起」
       if (heldRef.current) return
 
@@ -117,6 +125,7 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
           dx: startX - rect.left,
           dy: startY - rect.top,
           displaced: false,
+          detached,
         })
         // 拿起來時震一下，讓手指知道「起來了」
         navigator.vibrate?.(12)
@@ -182,6 +191,7 @@ export function useDrag({ onDropInto, onDropAway }: UseDragOptions) {
           dx: current.dx,
           dy: current.dy,
           displaced: true,
+          detached: true,
         })
       } else {
         setHeld(null)

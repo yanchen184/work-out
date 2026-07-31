@@ -6,6 +6,7 @@ import {
   dropToMakeup,
   moveGroup,
   mergeWeekPlans,
+  placeDetachedGroup,
   removeFromSlot,
   setSlotChecked,
   shiftWeekKey,
@@ -267,6 +268,17 @@ export function useWorkout() {
         const r = moveGroup(plan, from, to)
         if (r.plan !== plan) persist(r.plan)
         return r.displaced
+      },
+      [plan, persist],
+    ),
+
+    /** 把補做池或被頂出的方塊放回課表。 */
+    placeDetached: useCallback(
+      (groupId: string, to: DropTarget): string | null => {
+        if (!plan) return null
+        const result = placeDetachedGroup(plan, groupId, to)
+        if (result.plan !== plan) persist(result.plan)
+        return result.displaced
       },
       [plan, persist],
     ),

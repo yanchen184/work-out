@@ -226,6 +226,38 @@ describe('App — 格線外與垃圾桶都移到補做', () => {
     expect(within(makeup).getByText('二三頭')).toBeTruthy()
   })
 
+  it('本週補做顯示同款方塊，且可以拖回任一空格', async () => {
+    await renderApp()
+
+    const original = document.elementFromPoint
+    document.elementFromPoint = () => null
+    fireEvent.pointerDown(tile(0, 'morning', '二三頭'), { clientX: 10, clientY: 10 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 220))
+    })
+    await act(async () => {
+      fireEvent.pointerUp(window, { clientX: 5, clientY: 700 })
+    })
+
+    const makeup = document.querySelector('.makeup') as HTMLElement
+    const makeupTile = within(makeup).getByText('二三頭').closest('.tile') as HTMLElement
+    expect(makeupTile).toBeTruthy()
+    expect(makeupTile.closest('.mk-item')).toBeTruthy()
+
+    document.elementFromPoint = () => cell(6, 'morning')
+    fireEvent.pointerDown(makeupTile, { clientX: 20, clientY: 650 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 220))
+    })
+    await act(async () => {
+      fireEvent.pointerUp(window, { clientX: 200, clientY: 500 })
+    })
+    document.elementFromPoint = original
+
+    expect(within(cell(6, 'morning')).getByText('二三頭')).toBeTruthy()
+    expect(document.querySelector('.makeup')).toBeNull()
+  })
+
   it('已打勾的放到格線外會從原格消失，但不進補做', async () => {
     const user = userEvent.setup()
     await renderApp()

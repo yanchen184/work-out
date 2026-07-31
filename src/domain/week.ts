@@ -63,6 +63,31 @@ export function createWeekPlan(weekKey: string, schedule: Schedule): WeekPlan {
   return { weekKey, schedule, checked: [], makeups: [], updatedAt: Date.now() }
 }
 
+/**
+ * 修復舊版曾留下的矛盾資料：同一項同時留在原格、又出現在本週補做。
+ *
+ * 補做紀錄已經明確記著 fromDay/fromSlot，所以它在原格就必須消失。
+ * 只清精確的來源格；同一部位排在別天是合法的，不可一起刪掉。
+ */
+export function normalizeWeekPlan(plan: WeekPlan): WeekPlan {
+  let schedule = plan.schedule
+  let changed = false
+
+  for (const makeup of plan.makeups) {
+    const source = schedule[makeup.fromDay][makeup.fromSlot]
+    if (!source.includes(makeup.groupId)) continue
+    schedule = replaceSlot(
+      schedule,
+      makeup.fromDay,
+      makeup.fromSlot,
+      source.filter((groupId) => groupId !== makeup.groupId),
+    )
+    changed = true
+  }
+
+  return changed ? { ...plan, schedule } : plan
+}
+
 /** 同一毫秒連點也必須有嚴格遞增版本，否則遠端同 timestamp 可能反蓋本機。 */
 function nextUpdatedAt(plan: WeekPlan): number {
   return Math.max(Date.now(), plan.updatedAt + 1)
@@ -235,6 +260,44 @@ export interface MoveResult {
    * 使用者可以再把它放到別格，或放到格線外移進補做池。
    */
   readonly displaced: string | null
+}
+
+/**
+ * 把「目前不在課表上」的方塊放回某格。
+ *
+ * 來源可能是本週補做，也可能是剛被另一顆頂出來、仍黏在手上的項目。
+ * 放回後會清掉同部位的補做提醒；若壓在既有方塊上，該方塊會接著黏到手上。
+ */
+export function placeDetachedGroup(
+  plan: WeekPlan,
+  groupId: string,
+  to: DropTarget,
+): MoveResult {
+  const none = { plan, displaced: null }
+  const targetItems = plan.schedule[to.day][to.slot]
+  if (targetItems.includes(groupId)) return none
+
+  const displaced =
+    to.displaceGroupId && targetItems.includes(to.displaceGroupId) ? to.displaceGroupId : null
+  // 每格 UI 最多兩顆；滿格時必須明確壓在其中一顆上，不能偷偷塞成第三顆。
+  if (!displaced && targetItems.length >= 2) return none
+
+  const nextTarget = displaced
+    ? targetItems.map((item) => (item === displaced ? groupId : item))
+    : [...targetItems, groupId]
+
+  return {
+    plan: {
+      ...plan,
+      schedule: replaceSlot(plan.schedule, to.day, to.slot, nextTarget),
+      checked: displaced
+        ? plan.checked.filter((key) => key !== checkKey(to.day, to.slot, displaced))
+        : plan.checked,
+      makeups: plan.makeups.filter((item) => item.groupId !== groupId),
+      updatedAt: nextUpdatedAt(plan),
+    },
+    displaced,
+  }
 }
 
 /**
@@ -421,7 +484,7 @@ export { emptySchedule }
  * 逐項合併會生出兩台都沒排過的第三種課表，比直接取較新的更難理解。
  */
 export function mergeWeekPlans(a: WeekPlan, b: WeekPlan): WeekPlan {
-  const newer = b.updatedAt >= a.updatedAt ? b : a
+  const newer = normalizeWeekPlan(b.updatedAt >= a.updatedAt ? b : a)
   const aKeys = new Set(a.checked)
   const bKeys = new Set(b.checked)
   const aIsSubset = a.checked.every((key) => bKeys.has(key))

@@ -44,6 +44,8 @@ const rows = [
    '瀏覽器實測：連續替換不需重新拿起，displaced 狀態接手'],
   ['ok', '底部垃圾桶吸附移到補做', '拿起後底部出現垃圾桶；往下靠近時方塊吸附，放手從原格移除並進本週補做',
    '垃圾桶與其他格線外落點共用同一資料邏輯，只有呈現不同；元件測試涵蓋兩條路徑'],
+  ['ok', '補做正方形可拖回課表', '本週補做使用同款訓練方塊；長按可拖回任一早／晚格，放回後補做項消失',
+   '真實瀏覽器確認補做方塊與橫向單列版面；domain + 元件測試涵蓋空格拖回與頂替既有方塊'],
   ['ok', '兩顆底部按鈕', '部位進度、每週模板各自從底部彈上來',
    '2026-07-31 真實瀏覽器：兩個拉盤皆正常開闔；進度列圖騰與模板操作卡截圖確認，320px 無橫向溢出'],
   ['ok', '預設模板一早一晚', '一 二三頭/胸肩、二 間歇/背、三 腹肌/有氧課程、四 二三頭/籃球、五 間歇/胸肩、六 腹肌/背、日 休',
@@ -52,8 +54,8 @@ const rows = [
    'manifest 線上實測：display=standalone、start_url=/、有 192/512 icon'],
   ['ok', 'iOS 主畫面 icon 正確', '不是網頁截圖，是自己畫的 icon',
    '線上實測 apple-touch-icon 回 200 且真的是 180×180 PNG'],
-  ['ok', 'service worker 與預快取', '資產預快取，離線可開',
-   '線上實測：SW 註冊成功、scope=/，預快取檔數 ≥ 5'],
+  ['ok', 'service worker 與預快取', '資產預快取、離線可開；啟動時主動查新版並在接管後自動重載',
+   '線上曾實測抓到舊 PWA 仍載 index-C7aBbITB.js；已加入 registration.update + controllerchange reload 防止長期卡舊版'],
   ['ok', '斷網仍可開啟使用', '關掉網路重開 app 照樣進得去、還能打勾、打的勾留得住',
    '線上實測（setOffline）：重開畫面正常 → 離線打勾 0% → 7% → 再重開仍為 7%'],
   ['ok', '打勾記錄', '點部位即標記完成，狀態持久化',
@@ -122,7 +124,7 @@ const html = `<!doctype html>
   <div class="card">
     <div class="stat">
       <div><b>${rows.length}/${rows.length}</b><span>驗收條件通過</span></div>
-      <div><b>143</b><span>單元 + 元件測試</span></div>
+      <div><b>149</b><span>單元 + 元件測試</span></div>
       <div><b>51</b><span>瀏覽器實測項（版面 22 + PWA 本機 14 + PWA 線上 15）</span></div>
       <div><b>11</b><span>訓練部位配額</span></div>
     </div>
@@ -175,7 +177,8 @@ ${rowHtml}
         避免 Safari 接管手勢造成「拿得起來但丟不掉」。</li>
       <li><strong>預設模板一天一早一晚</strong> — 早上與晚上各一攤，不是全擠在早上。模板只是起點，隨時可改。</li>
       <li><strong>只打勾不記組數</strong> — 在健身房不想輸入數字；組數目標放在部位進度當參考。</li>
-      <li><strong>補做池只收「沒打勾」的</strong> — 已經做過的換掉不算欠，避免假提醒。</li>
+      <li><strong>補做池只收「沒打勾」的正方形</strong> — 已經做過的換掉不算欠；補做方塊可直接拖回課表，
+        放回後從補做池消失。舊資料若同時留在原格與補做，載入時會自動清掉精確原格。</li>
       <li><strong>PWA 而不是原生 app</strong> — 需求是「放到手機裡面」，PWA 一次搞定 iPhone 與電腦、
         不用 Xcode、不用上架、改完 push 就更新。離線之所以成立，是因為
         <code>localStorage</code> 本來就是 source of truth，雲端只是同步層。</li>

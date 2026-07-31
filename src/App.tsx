@@ -24,15 +24,19 @@ export default function App() {
   const [panel, setPanel] = useState<Panel>(null)
   const [picker, setPicker] = useState<Picker>(null)
 
-  const { move, dropAway } = w
+  const { move, placeDetached, dropAway } = w
 
   const onDropInto = useCallback(
-    (held: Held, zone: DropZone, displaceGroupId?: string): string | null =>
-      move(
-        { day: held.fromDay, slot: held.fromSlot, groupId: held.groupId },
-        { day: zone.day, slot: zone.slot, displaceGroupId },
-      ),
-    [move],
+    (held: Held, zone: DropZone, displaceGroupId?: string): string | null => {
+      const target = { day: zone.day, slot: zone.slot, displaceGroupId }
+      return held.detached
+        ? placeDetached(held.groupId, target)
+        : move(
+            { day: held.fromDay, slot: held.fromSlot, groupId: held.groupId },
+            target,
+          )
+    },
+    [move, placeDetached],
   )
 
   const onDropAway = useCallback(
@@ -144,6 +148,7 @@ export default function App() {
                       held?.groupId === gid &&
                       held.fromDay === day &&
                       held.fromSlot === slot &&
+                      !held.detached &&
                       !held.displaced
                     return (
                       <div key={gid} className="cell-item" data-group={gid}>
@@ -187,9 +192,27 @@ export default function App() {
                 const group = groupById(m.groupId)
                 if (!group) return null
                 return (
-                  <span key={`${m.groupId}-${m.fromDay}-${m.fromSlot}`} className="mk-chip">
-                    <i className="mk-dot" style={{ background: `var(--${group.tone})` }} />
-                    {group.name}
+                  <div
+                    key={`${m.groupId}-${m.fromDay}-${m.fromSlot}`}
+                    className="mk-item"
+                    data-group={m.groupId}
+                  >
+                    <Tile
+                      group={group}
+                      done={false}
+                      ghost={
+                        held?.groupId === m.groupId &&
+                        held.fromDay === m.fromDay &&
+                        held.fromSlot === m.fromSlot &&
+                        held.detached &&
+                        !held.displaced
+                      }
+                      onPointerDown={(e) =>
+                        drag.begin(e, m.groupId, m.fromDay, m.fromSlot, true)
+                      }
+                      onPointerMove={drag.maybeCancel}
+                      onPointerUp={drag.endPending}
+                    />
                     <button
                       className="mk-x"
                       onClick={() => w.dismiss(m.groupId)}
@@ -197,7 +220,7 @@ export default function App() {
                     >
                       ×
                     </button>
-                  </span>
+                  </div>
                 )
               })}
           </div>

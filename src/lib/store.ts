@@ -3,7 +3,7 @@ export type { UserId } from './firebase'
 import type { Schedule, Template, WeekPlan } from '../domain/types'
 import { isTemplate, isWeekPlan } from './schema'
 import { defaultSchedule } from '../domain/catalog'
-import { createWeekPlan, mergeWeekPlans } from '../domain/week'
+import { createWeekPlan, mergeWeekPlans, normalizeWeekPlan } from '../domain/week'
 import { dequeue, enqueue, flushQueue, queueSize, type PendingWrite } from './syncQueue'
 
 const LOCAL_PREFIX = 'workout'
@@ -96,7 +96,8 @@ export function watchCloud(listener: (ok: boolean) => void): () => void {
  * 而是正確的資料——雲端只是可能更新一點。
  */
 export function loadWeekLocal(uid: string, weekKey: string): WeekPlan | null {
-  return readLocal(localWeekKey(uid, weekKey), isWeekPlan)
+  const plan = readLocal(localWeekKey(uid, weekKey), isWeekPlan)
+  return plan ? normalizeWeekPlan(plan) : null
 }
 
 export function loadTemplateLocal(uid: string): Schedule | null {
@@ -162,7 +163,8 @@ export async function loadWeek(
   fallbackSchedule: Schedule,
 ): Promise<WeekPlan> {
   const key = localWeekKey(uid, weekKey)
-  const initialLocal = readLocal(key, isWeekPlan)
+  const rawInitialLocal = readLocal(key, isWeekPlan)
+  const initialLocal = rawInitialLocal ? normalizeWeekPlan(rawInitialLocal) : null
 
   const c = await cloud()
   if (c) {
@@ -179,7 +181,8 @@ export async function loadWeek(
            * initialLocal 合併，否則較晚的本機打勾會被這次舊讀取覆蓋。
            * 回應抵達時重讀一次 localStorage，才是真正的最新本機狀態。
            */
-          const latestLocal = readLocal(key, isWeekPlan) ?? initialLocal
+          const rawLatestLocal = readLocal(key, isWeekPlan)
+          const latestLocal = rawLatestLocal ? normalizeWeekPlan(rawLatestLocal) : initialLocal
           /**
            * 合併，不是二選一。兩台裝置各自離線打不同的勾時，單純取較新的那份
            * 會把另一台的勾整份蓋掉（實測過，勾就這樣消失）。見 mergeWeekPlans。
@@ -199,7 +202,8 @@ export async function loadWeek(
     }
   }
 
-  const latestLocal = readLocal(key, isWeekPlan) ?? initialLocal
+  const rawLatestLocal = readLocal(key, isWeekPlan)
+  const latestLocal = rawLatestLocal ? normalizeWeekPlan(rawLatestLocal) : initialLocal
   if (latestLocal) return latestLocal
   // 這週還沒開始 → 用模板生成一份新的
   return createWeekPlan(weekKey, fallbackSchedule)

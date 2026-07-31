@@ -189,6 +189,21 @@ describe('saveWeek — 即時寫入也要合併', () => {
 })
 
 describe('loadWeek — 雲端讀取', () => {
+  it('舊資料同一項同時在原格與補做 → 載入時自動從原格清掉', async () => {
+    const broken = {
+      ...base(),
+      makeups: [
+        { groupId: 'arms', fromDay: 0 as const, fromSlot: 'morning' as const, dismissed: false },
+      ],
+    }
+    localStorage.setItem(`workout:bob:week:${WEEK}`, JSON.stringify(broken))
+
+    const loaded = await loadWeek('bob', WEEK, defaultSchedule())
+
+    expect(loaded.schedule[0].morning).not.toContain('arms')
+    expect(loaded.makeups.map((m) => m.groupId)).toContain('arms')
+  })
+
   it('雲端讀取途中打勾，回應抵達後不會用舊本機資料蓋掉', async () => {
     localStorage.setItem(`workout:bob:week:${WEEK}`, JSON.stringify(base()))
     cloud.set(PATH, JSON.parse(JSON.stringify(base())))

@@ -8,7 +8,9 @@ import {
   mergeWeekPlans,
   mondayOfWeekKey,
   moveGroup,
+  normalizeWeekPlan,
   overallProgress,
+  placeDetachedGroup,
   removeFromSlot,
   setSlotChecked,
   shiftWeekKey,
@@ -414,6 +416,65 @@ describe('dropToMakeup — 格線外放手 → 原格移除並進補做', () => 
 
     expect(next.schedule[1].morning).not.toContain('hiit')
     expect(next.makeups.map((m) => m.groupId)).toContain('hiit')
+  })
+})
+
+describe('placeDetachedGroup — 把補做方塊拖回課表', () => {
+  it('放進空格後從補做消失', () => {
+    const base = createWeekPlan('2026-W31', defaultSchedule())
+    const inMakeup = dropToMakeup(base, 'arms', 0, 'morning')
+
+    const result = placeDetachedGroup(inMakeup, 'arms', { day: 6, slot: 'morning' })
+
+    expect(result.plan.schedule[6].morning).toContain('arms')
+    expect(result.plan.makeups.map((item) => item.groupId)).not.toContain('arms')
+    expect(result.displaced).toBeNull()
+  })
+
+  it('壓在既有方塊上時，原方塊會被頂到手上', () => {
+    const base = createWeekPlan('2026-W31', defaultSchedule())
+    const inMakeup = dropToMakeup(base, 'arms', 0, 'morning')
+
+    const result = placeDetachedGroup(inMakeup, 'arms', {
+      day: 1,
+      slot: 'morning',
+      displaceGroupId: 'hiit',
+    })
+
+    expect(result.plan.schedule[1].morning).toContain('arms')
+    expect(result.plan.schedule[1].morning).not.toContain('hiit')
+    expect(result.displaced).toBe('hiit')
+  })
+})
+
+describe('normalizeWeekPlan — 修復舊版原格與補做重複', () => {
+  it('同一項已在補做時，會從它記錄的原格移除', () => {
+    const base = createWeekPlan('2026-W31', defaultSchedule())
+    const broken = {
+      ...base,
+      makeups: [
+        { groupId: 'arms', fromDay: 0 as const, fromSlot: 'morning' as const, dismissed: false },
+      ],
+    }
+
+    const fixed = normalizeWeekPlan(broken)
+
+    expect(fixed.schedule[0].morning).not.toContain('arms')
+    expect(fixed.makeups.map((m) => m.groupId)).toContain('arms')
+  })
+
+  it('只清原格，不會誤刪同一部位在其他天的安排', () => {
+    const base = createWeekPlan('2026-W31', defaultSchedule())
+    const broken = {
+      ...base,
+      makeups: [
+        { groupId: 'arms', fromDay: 0 as const, fromSlot: 'morning' as const, dismissed: false },
+      ],
+    }
+
+    const fixed = normalizeWeekPlan(broken)
+
+    expect(fixed.schedule[3].morning).toContain('arms')
   })
 })
 

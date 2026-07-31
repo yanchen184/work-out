@@ -682,10 +682,12 @@
 /* ── 補做 ─────────────────────────────────────── */
 
 .makeup {
+  flex: 0 0 auto;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 11px 12px;
+  overflow: hidden;
 }
 
 .mk-title {
@@ -697,32 +699,42 @@
 
 .mk-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
+  flex-wrap: nowrap;
+  gap: 9px;
+  overflow-x: auto;
+  padding: 6px;
+  margin: -6px;
+  scrollbar-width: none;
 }
 
-.mk-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 6px 4px 9px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  font-size: 13px;
+.mk-list::-webkit-scrollbar {
+  display: none;
 }
 
-.mk-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
+.mk-item {
+  flex: 0 0 74px;
+  position: relative;
+  width: 74px;
+  height: 74px;
+  container-type: inline-size;
 }
 
 .mk-x {
+  position: absolute;
+  z-index: 2;
+  top: -6px;
+  right: -6px;
+  width: 21px;
+  height: 21px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
   color: var(--text-faint);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1;
-  padding: 0 2px;
+  box-shadow: 0 2px 6px rgba(42, 35, 28, 0.12);
 }
 
 /* ── 底部兩顆按鈕 ─────────────────────────────── */
